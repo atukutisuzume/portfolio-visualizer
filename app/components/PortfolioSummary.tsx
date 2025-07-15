@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import PortfolioPieChart from "@/components/PortfolioPieChart";
-import { PortfolioData } from "@/types";
+import { PortfolioData } from "@/type";
 
 type Props = {
   displayData: PortfolioData[];
@@ -19,7 +19,7 @@ export default function PortfolioSummary({ displayData, displayTotalAsset, reset
       <PortfolioPieChart data={displayData}/>
       <div className="text-center mt-6">
         <button onClick={reset} className="bg-indigo-600 text-white px-6 py-2 rounded shadow hover:bg-indigo-700 transition">
-          新しいファイルをアップロード
+          クリア
         </button>
       </div>
     </section>

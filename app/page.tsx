@@ -1,12 +1,16 @@
 "use client";
-import FileUpload from "@/components/FileUpload";
-import PortfolioInputs from "@/components/PortfolioInputs";
-import PortfolioSummary from "@/components/PortfolioSummary";
-import PortfolioHistorySelect from "@/components/PortfolioHistorySelect";
-import { usePortfolioData } from "@/hooks/usePortfolioData";
+import { useState } from "react";
+import TabNavigation from "@/components/TabNavigation";
+import UploadTab from "@/components/UploadTab";
+import PortfolioTab from "@/components/PortfolioTab";
+
+const tabs = [
+  { id: 'upload', label: 'アップロード' },
+  { id: 'portfolio', label: 'ポートフォリオ' }
+];
 
 export default function Home() {
-  const portfolio = usePortfolioData();
+  const [activeTab, setActiveTab] = useState('upload');
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
@@ -16,42 +20,14 @@ export default function Home() {
           <p className="text-slate-600">CSVをアップロードし、グラフで分析・管理！</p>
         </header>
 
-        {portfolio.successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded shadow">
-            <p className="text-green-700">{portfolio.successMessage}</p>
-          </div>
-        )}
+        <TabNavigation 
+          tabs={tabs} 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+        />
 
-        {portfolio.error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded shadow">
-            <p className="text-red-700">{portfolio.error}</p>
-          </div>
-        )}
-
-        <FileUpload onFileSelect={portfolio.handleFile} disabled={portfolio.isBusy} />
-
-        <PortfolioInputs {...portfolio} />
-
-        {portfolio.availableDates.length > 0 && (
-          <PortfolioHistorySelect {...portfolio} />
-        )}
-
-        {portfolio.displayData.length > 0 && (
-          <PortfolioSummary 
-            displayData={portfolio.displayData} 
-            displayTotalAsset={portfolio.displayTotalAsset} 
-            reset={() => {
-              portfolio.setCurrentPortfolioData([]);
-              portfolio.setDisplayData([]);
-              portfolio.setDisplayTotalAsset(null);
-              portfolio.setBrokerName('');
-              portfolio.setTotalAsset('');
-              portfolio.setSelectedDate(new Date().toISOString().split('T')[0]);
-              portfolio.setError(null);
-              portfolio.setSuccessMessage(null);
-            }}
-          />
-        )}
+        {activeTab === 'upload' && <UploadTab />}
+        {activeTab === 'portfolio' && <PortfolioTab />}
       </div>
     </main>
   );
