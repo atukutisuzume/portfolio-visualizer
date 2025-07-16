@@ -2,7 +2,7 @@ import Papa from "papaparse";
 import { PortfolioItem } from "@/type";
 import Encoding from "encoding-japanese";
 
-export async function parseCsv(file: File): Promise<{ portfolio: PortfolioItem[], totalAsset: number | null }> {
+export async function parseCsv(file: File): Promise<{ portfolio: PortfolioItem[], totalAsset: number | null, brokerType: "rakuten" | "moomoo" | null }> {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
@@ -25,14 +25,14 @@ export async function parseCsv(file: File): Promise<{ portfolio: PortfolioItem[]
     return result;
 }
 
-function parseCsvText(text: string, fileName: string): { portfolio: PortfolioItem[], totalAsset: number | null } {
+function parseCsvText(text: string, fileName: string): { portfolio: PortfolioItem[], totalAsset: number | null, brokerType: "rakuten" | "moomoo" | null } {
     if (text.includes("■特定口座")) {
-        return parseRakutenCsv(text);
+        return { ...parseRakutenCsv(text), brokerType: "rakuten" };
     }
     if (text.includes('"コード","銘柄名","口座区分"')) {
-        return parseMoomooCsv(text, fileName);
+        return { ...parseMoomooCsv(text, fileName), brokerType: "moomoo" };
     }
-    return { portfolio: [], totalAsset: null };
+    return { portfolio: [], totalAsset: null, brokerType: null };
 }
 
 export function parseRakutenCsv(text: string): { portfolio: PortfolioItem[], totalAsset: number | null } {

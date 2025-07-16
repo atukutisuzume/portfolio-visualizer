@@ -27,9 +27,12 @@ export function usePortfolioUpload() {
     setSuccessMessage(null);
 
     try {
-      const { portfolio, totalAsset } = await parseCsv(file);
+      const { portfolio, totalAsset, brokerType } = await parseCsv(file);
       setCurrentPortfolioItems(portfolio);
       setTotalAsset(totalAsset || '');
+      if (brokerType) {
+        setBrokerName(brokerType);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'CSV解析エラー');
     } finally {
