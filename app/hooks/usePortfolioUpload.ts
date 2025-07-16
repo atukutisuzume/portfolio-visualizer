@@ -4,11 +4,12 @@ import { useState } from "react";
 import { PortfolioItem } from "@/type";
 import { parseCsv } from "@/lib/csvParser";
 import { savePortfolioWithItems } from "@/lib/api";
+import { extractDateFromFilename } from "@/lib/extractDateFromFilename";
 
 export function usePortfolioUpload() {
   const [currentPortfolioItems, setCurrentPortfolioItems] = useState<PortfolioItem[]>([]);
   
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(''); // 初期値を削除
   const [brokerName, setBrokerName] = useState<string>('');
   const [totalAsset, setTotalAsset] = useState<number | ''>('');
 
@@ -27,6 +28,9 @@ export function usePortfolioUpload() {
     setSuccessMessage(null);
 
     try {
+      const extractedDate = extractDateFromFilename(file.name);
+      setSelectedDate(extractedDate);
+
       const { portfolio, totalAsset, brokerType } = await parseCsv(file);
       setCurrentPortfolioItems(portfolio);
       setTotalAsset(totalAsset || '');
@@ -64,7 +68,7 @@ export function usePortfolioUpload() {
       setCurrentPortfolioItems([]);
       setBrokerName('');
       setTotalAsset('');
-      setSelectedDate(new Date().toISOString().split('T')[0]);
+      setSelectedDate(''); // 初期値を削除
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存エラー');
     } finally {
