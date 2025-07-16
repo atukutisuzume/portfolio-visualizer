@@ -38,7 +38,34 @@ export function usePortfolioDisplay() {
     try {
       const { items, totalAsset } = await fetchPortfolio(date);
 
-      setDisplayData(items);
+      // USD換算と上位15銘柄以外の集約
+      const processedItems = items.map(item => ({
+        ...item,
+        value: item.currency === "USD" ? item.value * 145 : item.value
+      }));
+
+      const sortedItems = [...processedItems].sort((a, b) => b.value - a.value);
+
+      let finalDisplayItems: PortfolioItem[] = [];
+      if (sortedItems.length > 15) {
+        finalDisplayItems = sortedItems.slice(0, 15);
+        const otherValue = sortedItems.slice(15).reduce((sum, item) => sum + item.value, 0);
+        finalDisplayItems.push({
+          code: "OTHER",
+          name: "その他",
+          quantity: 0,
+          price: 0,
+          value: otherValue,
+          average_price: 0,
+          gain_loss: 0,
+          currency: "JPY", // その他はJPYとして扱う
+          position_type: "cash", // その他はcashとして扱う
+        });
+      } else {
+        finalDisplayItems = sortedItems;
+      }
+
+      setDisplayData(finalDisplayItems);
       setDisplayTotalAsset(totalAsset);
     } catch (err) {
       setError(err instanceof Error ? err.message : '履歴取得エラー');

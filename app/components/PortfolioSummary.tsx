@@ -16,7 +16,7 @@ export default function PortfolioSummary({ displayData, displayTotalAsset, reset
       {displayTotalAsset !== null && (
         <p className="text-slate-600 mb-4">総資産額: {displayTotalAsset.toLocaleString()}円</p>
       )}
-      <PortfolioPieChart data={displayData}/>
+      <PortfolioPieChart data={displayData} totalPortfolioAsset={displayTotalAsset}/>
       <div className="text-center mt-6">
         <button onClick={reset} className="bg-indigo-600 text-white px-6 py-2 rounded shadow hover:bg-indigo-700 transition">
           クリア
