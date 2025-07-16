@@ -38,14 +38,8 @@ export function usePortfolioDisplay() {
     try {
       const { items, totalAsset } = await fetchPortfolio(date);
 
-      const processedItems = items.map(item => ({
-        ...item,
-        value: item.currency === "USD" ? item.value * 145 : item.value
-      }));
-      const processedTotalAsset = processedItems.reduce((sum, item) => sum + item.value, 0);
-
-      setDisplayData(processedItems);
-      setDisplayTotalAsset(processedTotalAsset);
+      setDisplayData(items);
+      setDisplayTotalAsset(totalAsset);
     } catch (err) {
       setError(err instanceof Error ? err.message : '履歴取得エラー');
     } finally {

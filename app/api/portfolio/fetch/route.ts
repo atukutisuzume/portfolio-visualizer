@@ -52,8 +52,8 @@ export async function GET(request: Request) {
 
     const mergedItems = Array.from(mergedItemsMap.values());
 
-    // 3a. 総資産を合算 (銘柄のvalueから計算)
-    const totalAsset = mergedItems.reduce((sum, item) => sum + item.value, 0);
+    // 3a. 総資産を合算
+    const totalAsset = portfolios.reduce((sum, p) => sum + p.total_asset, 0);
 
     // 4. マージしたデータを返す
     return NextResponse.json({
