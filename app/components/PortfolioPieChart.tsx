@@ -45,7 +45,7 @@ export default function PortfolioPieChart({ data }: { data: PortfolioItem[] }) {
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {sortedData.map((item, index) => {
                 const percent = ((item.value / total) * 100).toFixed(1);
-                const truncatedName = item.name.length > 20 ? `${item.name.substring(0, 20)}...` : item.name;
+                const truncatedName = item.name.length > 20 ? `${item.name.substring(0, 18)}...` : item.name;
                 return (
                   <li
                     key={`item-${index}`}
