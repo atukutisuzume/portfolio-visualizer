@@ -29,5 +29,6 @@ export interface PortfolioItem {
   average_price: number;
   gain_loss: number;
   currency: "JPY" | "USD";
+  position_type?: "cash" | "margin";
   created_at?: string;
 }

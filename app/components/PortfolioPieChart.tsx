@@ -10,7 +10,11 @@ export default function PortfolioPieChart({ data }: { data: PortfolioItem[] }) {
     return <p>データがありません</p>;
   }
 
-  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  const processedData = data.map(item => ({
+    ...item,
+    value: item.currency === "USD" ? item.value * 145 : item.value
+  }));
+  const sortedData = [...processedData].sort((a, b) => b.value - a.value);
   const total = sortedData.reduce((acc, item) => acc + item.value, 0);
 
   return (

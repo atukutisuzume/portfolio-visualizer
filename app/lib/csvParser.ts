@@ -18,19 +18,19 @@ export async function parseCsv(file: File): Promise<{ portfolio: PortfolioItem[]
         text = Encoding.codeToString(unicodeArray);
     }
 
-    const result = parseCsvText(text);
+    const result = parseCsvText(text, file.name);
     if (!result || result.portfolio.length === 0) {
         throw new Error("parseCsv.未知のCSVフォーマットです。楽天証券またはmoomoo証券のCSVをアップロードしてください。");
     }
     return result;
 }
 
-function parseCsvText(text: string): { portfolio: PortfolioItem[], totalAsset: number | null } {
+function parseCsvText(text: string, fileName: string): { portfolio: PortfolioItem[], totalAsset: number | null } {
     if (text.includes("■特定口座")) {
         return parseRakutenCsv(text);
     }
     if (text.includes('"コード","銘柄名","口座区分"')) {
-        return parseMoomooCsv(text);
+        return parseMoomooCsv(text, fileName);
     }
     return { portfolio: [], totalAsset: null };
 }
@@ -71,6 +71,7 @@ export function parseRakutenCsv(text: string): { portfolio: PortfolioItem[], tot
             average_price: parseFloat((obj["平均取得価額［円］"] || "0").replace(/,/g, "")),
             gain_loss: parseFloat((obj["評価損益［円］"] || "0").replace(/,/g, "")),
             currency: "JPY",
+            position_type: "cash",
         };
     });
     
@@ -79,7 +80,10 @@ export function parseRakutenCsv(text: string): { portfolio: PortfolioItem[], tot
     return { portfolio, totalAsset };
 }
 
-function parseMoomooCsv(text: string): { portfolio: PortfolioItem[], totalAsset: number | null } {
+function parseMoomooCsv(text: string, fileName: string): { portfolio: PortfolioItem[], totalAsset: number | null } {
+    const isMargin = fileName.includes("信用");
+    const positionType = isMargin ? "margin" : "cash";
+
     const data = Papa.parse<any>(text, {
         header: true,
         skipEmptyLines: true
@@ -94,6 +98,7 @@ function parseMoomooCsv(text: string): { portfolio: PortfolioItem[], totalAsset:
         average_price: parseFloat((row["平均取得単価"] || "0").replace(/,/g, "")),
         gain_loss: parseFloat((row["損益"] || "0").replace(/,/g, "")),
         currency: row["通貨"] === "JPY" ? "JPY" : "USD",
+        position_type: positionType,
     }));
 
     const totalAsset = portfolio.reduce((sum, item) => sum + item.value, 0);
