@@ -31,9 +31,8 @@ export function usePortfolioUpload() {
       const extractedDate = extractDateFromFilename(file.name);
       setSelectedDate(extractedDate);
 
-      const { portfolio, totalAsset, brokerType } = await parseCsv(file);
+      const { portfolio, brokerType } = await parseCsv(file);
       setCurrentPortfolioItems(portfolio);
-      setTotalAsset(totalAsset || '');
       if (brokerType) {
         setBrokerName(brokerType);
       }
