@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PortfolioData, StockEntry } from "@/types";
+import { PortfolioItem } from "@/type";
 import { parseCsv } from "@/lib/csvParser";
-import { fetchAvailableDates, savePortfolio, fetchPortfolio } from "@/lib/api";
+import { fetchAvailableDates, savePortfolioWithItems, fetchPortfolio } from "@/lib/api";
 
 export function usePortfolioData() {
-  const [currentPortfolioData, setCurrentPortfolioData] = useState<PortfolioData[]>([]);
-  const [displayData, setDisplayData] = useState<PortfolioData[]>([]);
+  const [currentPortfolioItems, setCurrentPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [displayData, setDisplayData] = useState<PortfolioItem[]>([]);
   const [displayTotalAsset, setDisplayTotalAsset] = useState<number | null>(null);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
@@ -23,7 +23,7 @@ export function usePortfolioData() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isBusy = isLoading || isSaving || isFetchingHistory;
-  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '' || currentPortfolioData.length === 0;
+  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0;
 
   useEffect(() => {
     (async () => {
@@ -43,13 +43,11 @@ export function usePortfolioData() {
     setSuccessMessage(null);
 
     try {
-      const parsedData = await parseCsv(file);
-      setCurrentPortfolioData(parsedData);
-      setDisplayData(parsedData);
-
-      const calculated = parsedData.reduce((sum, item) => sum + item.value, 0);
-      setTotalAsset(calculated);
-      setDisplayTotalAsset(calculated);
+      const { portfolio, totalAsset } = await parseCsv(file);
+      setCurrentPortfolioItems(portfolio);
+      setDisplayData(portfolio);
+      setTotalAsset(totalAsset || '');
+      setDisplayTotalAsset(totalAsset);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'CSV解析エラー');
     } finally {
@@ -58,7 +56,7 @@ export function usePortfolioData() {
   };
 
   const handleSave = async () => {
-    if (!selectedDate || !brokerName || totalAsset === '' || currentPortfolioData.length === 0) {
+    if (!selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0) {
       setError('日付、証券会社名、総資産額、またはデータが不足しています。');
       return;
     }
@@ -68,14 +66,13 @@ export function usePortfolioData() {
     setSuccessMessage(null);
 
     try {
-      const stocks: StockEntry[] = currentPortfolioData.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        value: item.value
-      }));
+      const portfolio = {
+        broker: brokerName,
+        total_asset: Number(totalAsset),
+        created_at: selectedDate,
+      };
 
-      await savePortfolio(selectedDate, brokerName, Number(totalAsset), stocks);
+      await savePortfolioWithItems(portfolio, currentPortfolioItems);
       setSuccessMessage("✅ ポートフォリオを保存しました！");
       
       const dates = await fetchAvailableDates();
@@ -96,10 +93,10 @@ export function usePortfolioData() {
     setSuccessMessage(null);
 
     try {
-      const { portfolioData, totalAsset: fetchedTotal } = await fetchPortfolio(date);
-      setDisplayData(portfolioData);
-      setDisplayTotalAsset(fetchedTotal);
-      setCurrentPortfolioData([]);
+      const { items, portfolio } = await fetchPortfolio(date);
+      setDisplayData(items);
+      setDisplayTotalAsset(portfolio.total_asset);
+      setCurrentPortfolioItems([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : '履歴取得エラー');
     } finally {
@@ -108,7 +105,7 @@ export function usePortfolioData() {
   };
 
   return {
-    currentPortfolioData, displayData, displayTotalAsset,
+    currentPortfolioItems, displayData, displayTotalAsset,
     availableDates, selectedDate, setSelectedDate,
     brokerName, setBrokerName, totalAsset, setTotalAsset,
     handleFile, handleSave, handleDateSelect,

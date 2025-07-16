@@ -1,3 +1,5 @@
+import { Portfolio, PortfolioItem } from '@/type';
+
 export async function fetchAvailableDates(): Promise<string[]> {
   const res = await fetch('/api/portfolio/dates');
   if (!res.ok) throw new Error('日付履歴の取得に失敗しました。');
@@ -5,30 +7,24 @@ export async function fetchAvailableDates(): Promise<string[]> {
   return data.dates;
 }
 
-export async function savePortfolio(
-  date: string,
-  broker: string,
-  total_asset: number,
-  stocks: { name: string; quantity: number; price: number; value: number; }[]
+export async function savePortfolioWithItems(
+  portfolio: Portfolio,
+  items: PortfolioItem[]
 ) {
-    console.log(`date:${date}`)
-    console.log(`broker:${broker}`)
-    console.log(`total_asset:${total_asset}`)
-    console.log(stocks)
   const res = await fetch('/api/portfolio/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, broker, total_asset, stocks }),
+    body: JSON.stringify({ portfolio, items }),
   });
-  console.log(`res:${res}`)
+
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.error || '保存に失敗しました');
   }
 }
 
-export async function fetchPortfolio(date: string) {
-  const res = await fetch(`/api/portfolio/fetch?date=${date}`);
+export async function fetchPortfolio(date: string): Promise<{ items: PortfolioItem[], totalAsset: number }> {
+  const res = await fetch(`/api/portfolio/fetch?date=${encodeURIComponent(date)}`);
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.error || '履歴取得に失敗しました');

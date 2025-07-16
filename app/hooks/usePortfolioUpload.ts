@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { PortfolioData, StockEntry } from "@/type";
+import { PortfolioItem } from "@/type";
 import { parseCsv } from "@/lib/csvParser";
-import { savePortfolio } from "@/lib/api";
+import { savePortfolioWithItems } from "@/lib/api";
 
 export function usePortfolioUpload() {
-  const [currentPortfolioData, setCurrentPortfolioData] = useState<PortfolioData[]>([]);
+  const [currentPortfolioItems, setCurrentPortfolioItems] = useState<PortfolioItem[]>([]);
   
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [brokerName, setBrokerName] = useState<string>('');
@@ -19,7 +19,7 @@ export function usePortfolioUpload() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isBusy = isLoading || isSaving;
-  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '' || currentPortfolioData.length === 0;
+  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0;
 
   const handleFile = async (file: File) => {
     setIsLoading(true);
@@ -27,11 +27,9 @@ export function usePortfolioUpload() {
     setSuccessMessage(null);
 
     try {
-      const parsedData = await parseCsv(file);
-      setCurrentPortfolioData(parsedData);
-
-      const calculated = parsedData.reduce((sum, item) => sum + item.value, 0);
-      setTotalAsset(calculated);
+      const { portfolio, totalAsset } = await parseCsv(file);
+      setCurrentPortfolioItems(portfolio);
+      setTotalAsset(totalAsset || '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'CSV解析エラー');
     } finally {
@@ -40,7 +38,7 @@ export function usePortfolioUpload() {
   };
 
   const handleSave = async () => {
-    if (!selectedDate || !brokerName || totalAsset === '' || currentPortfolioData.length === 0) {
+    if (!selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0) {
       setError('日付、証券会社名、総資産額、またはデータが不足しています。');
       return;
     }
@@ -50,18 +48,17 @@ export function usePortfolioUpload() {
     setSuccessMessage(null);
 
     try {
-      const stocks = currentPortfolioData.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        value: item.value
-      }));
+      const portfolio = {
+        broker: brokerName,
+        total_asset: Number(totalAsset),
+        created_at: selectedDate,
+      };
 
-      await savePortfolio(selectedDate, brokerName, Number(totalAsset), stocks);
+      await savePortfolioWithItems(portfolio, currentPortfolioItems);
       setSuccessMessage("✅ ポートフォリオを保存しました！");
       
       // 保存後にフォームをリセット
-      setCurrentPortfolioData([]);
+      setCurrentPortfolioItems([]);
       setBrokerName('');
       setTotalAsset('');
       setSelectedDate(new Date().toISOString().split('T')[0]);
@@ -73,7 +70,7 @@ export function usePortfolioUpload() {
   };
 
   return {
-    currentPortfolioData,
+    currentPortfolioItems,
     selectedDate, setSelectedDate,
     brokerName, setBrokerName,
     totalAsset, setTotalAsset,

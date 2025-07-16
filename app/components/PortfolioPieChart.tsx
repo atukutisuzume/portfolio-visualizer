@@ -1,10 +1,10 @@
 "use client";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { PortfolioData } from "@/types";
+import { PortfolioItem } from "@/type";
 
 const COLORS = ["#6366F1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#EF4444"];
 
-export default function PortfolioPieChart({ data }: { data: PortfolioData[] }) {
+export default function PortfolioPieChart({ data }: { data: PortfolioItem[] }) {
   if (!Array.isArray(data)) {
     console.error("PortfolioPieChart に配列以外の data が渡されました:", data);
     return <p>データがありません</p>;
@@ -45,6 +45,7 @@ export default function PortfolioPieChart({ data }: { data: PortfolioData[] }) {
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {sortedData.map((item, index) => {
                 const percent = ((item.value / total) * 100).toFixed(1);
+                const truncatedName = item.name.length > 20 ? `${item.name.substring(0, 20)}...` : item.name;
                 return (
                   <li
                     key={`item-${index}`}
@@ -52,8 +53,9 @@ export default function PortfolioPieChart({ data }: { data: PortfolioData[] }) {
                       color: COLORS[index % COLORS.length],
                       marginBottom: 4,
                     }}
+                    title={item.name} // ホバー時にフルネームを表示
                   >
-                    {item.name} ({percent}%)
+                    {truncatedName} ({percent}%)
                   </li>
                 );
               })}

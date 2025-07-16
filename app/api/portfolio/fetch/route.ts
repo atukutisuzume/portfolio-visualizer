@@ -1,59 +1,68 @@
 // app/api/portfolio/fetch/route.ts
 
-import { NextResponse } from 'next/server'; // App RouterのAPIルートで使用
-import { createClient } from "@supabase/supabase-js"; // Supabaseクライアントのインポート
+import { NextResponse } from 'next/server';
+import { createClient } from "@supabase/supabase-js";
+import { PortfolioItem } from '@/type';
 
-// Supabaseクライアントの初期化
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
-// GETメソッドのハンドラーを名前付きエクスポート
-export async function GET(request: Request) { // Requestオブジェクトを受け取る
-  // URLオブジェクトを作成し、クエリパラメータを解析
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get("date"); // 'date' クエリパラメータを取得
+  const date = searchParams.get("date");
 
   if (!date) {
-    return NextResponse.json(
-      { error: "Date parameter is required." },
-      { status: 400 } // Bad Request
-    );
+    return NextResponse.json({ error: "Date parameter is required." }, { status: 400 });
   }
 
   try {
-    const { data, error } = await supabase
-      .from("portfolio")
-      .select("*") // 全てのカラムを選択
-      .eq("date", date) // 'date' カラムがクエリパラメータと一致するレコードをフィルタリング
-      .single(); // 結果が1件であることを期待
+    // 1. 指定された日付のポートフォリオをすべて取得
+    const { data: portfolios, error: portfolioError } = await supabase
+      .from("portfolios")
+      .select("id, total_asset")
+      .eq("created_at", date);
 
-      console.log(data)
-      console.log(error)
+    if (portfolioError) throw portfolioError;
 
-    if (error) {
-      console.error("Supabase fetch error:", error); // エラー詳細をログに出力
-      // 特定のエラーメッセージ（例: レコードが見つからない場合）に応じて異なるステータスを返すことも可能
-      // if (error.code === 'PGRST116') { // 例えば、PostgRESTのエラーコード
-      //   return NextResponse.json({ error: "Portfolio data not found for this date." }, { status: 404 });
-      // }
-      throw new Error(error.message || "Failed to fetch portfolio data from Supabase.");
+    if (!portfolios || portfolios.length === 0) {
+      return NextResponse.json({ error: "Portfolio not found for this date." }, { status: 404 });
     }
 
-    // 成功時のJSONレスポンスと200ステータスを返す
+    // 2. 取得した全ポートフォリオのIDを使って、関連する銘柄をすべて取得
+    const portfolioIds = portfolios.map(p => p.id);
+    const { data: allItems, error: itemsError } = await supabase
+      .from("portfolio_items")
+      .select("*")
+      .in("portfolio_id", portfolioIds);
+
+    if (itemsError) throw itemsError;
+
+    // 3. データをマージ
+    // 3a. 総資産を合算
+    const totalAsset = portfolios.reduce((sum, p) => sum + p.total_asset, 0);
+
+    // 3b. 銘柄をコードごとに集約
+    const mergedItemsMap = new Map<string, PortfolioItem>();
+    allItems?.forEach(item => {
+      if (mergedItemsMap.has(item.code)) {
+        const existing = mergedItemsMap.get(item.code)!;
+        existing.quantity += item.quantity;
+        existing.value += item.value;
+        existing.gain_loss += item.gain_loss;
+      } else {
+        mergedItemsMap.set(item.code, { ...item });
+      }
+    });
+
+    const mergedItems = Array.from(mergedItemsMap.values());
+
+    // 4. マージしたデータを返す
     return NextResponse.json({
-      portfolioData: data.stocks,
-      totalAsset: data.total_asset,
+      items: mergedItems,
+      totalAsset: totalAsset,
     }, { status: 200 });
 
   } catch (err: any) {
-    console.error("API error:", err); // API処理中のエラーをログに出力
-    // エラーメッセージを含んだJSONレスポンスと500ステータスを返す
-    return NextResponse.json(
-      { error: err.message || "取得失敗" },
-      { status: 500 }
-    );
+    console.error("API error:", err);
+    return NextResponse.json({ error: err.message || "取得失敗" }, { status: 500 });
   }
 }
-
-// もしこのエンドポイントで他のHTTPメソッドをサポートする必要があるなら、
-// 同様に名前付きエクスポートで関数を定義します。
-// export async function POST(request: Request) { ... }

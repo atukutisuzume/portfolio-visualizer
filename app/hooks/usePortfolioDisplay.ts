@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PortfolioData } from "@/type";
+import { PortfolioItem } from "@/type";
 import { fetchAvailableDates, fetchPortfolio } from "@/lib/api";
 
 export function usePortfolioDisplay() {
-  const [displayData, setDisplayData] = useState<PortfolioData[]>([]);
+  const [displayData, setDisplayData] = useState<PortfolioItem[]>([]);
   const [displayTotalAsset, setDisplayTotalAsset] = useState<number | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -36,9 +36,9 @@ export function usePortfolioDisplay() {
     setIsFetchingHistory(true);
 
     try {
-      const { portfolioData, totalAsset: fetchedTotal } = await fetchPortfolio(date);
-      setDisplayData(portfolioData);
-      setDisplayTotalAsset(fetchedTotal);
+      const { items, totalAsset } = await fetchPortfolio(date);
+      setDisplayData(items);
+      setDisplayTotalAsset(totalAsset);
     } catch (err) {
       setError(err instanceof Error ? err.message : '履歴取得エラー');
     } finally {

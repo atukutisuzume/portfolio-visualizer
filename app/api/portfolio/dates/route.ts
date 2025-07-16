@@ -11,17 +11,18 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_AN
 export async function GET(request: Request) { // Requestオブジェクトを受け取る
   try {
     const { data, error } = await supabase
-      .from("portfolio")
-      .select("date")
-      .order("date", { ascending: false });
+      .from("portfolios")
+      .select("created_at")
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Supabase error:", error); // エラー詳細をログに出力
       throw new Error(error.message || "Failed to fetch dates from Supabase");
     }
 
-    // 取得した日付データを抽出してJSONレスポンスとして返す
-    return NextResponse.json({ dates: data.map((d) => d.date) });
+    // 取得した日付データから重複を除外してJSONレスポンスとして返す
+    const uniqueDates = [...new Set(data.map((d) => d.created_at))];
+    return NextResponse.json({ dates: uniqueDates });
 
   } catch (err: any) {
     console.error("API error:", err); // API処理中のエラーをログに出力
