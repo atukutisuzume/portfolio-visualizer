@@ -5,7 +5,7 @@ import { Portfolio, PortfolioItem } from '@/type';
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
 async function savePortfolioWithItems(portfolio: Portfolio, items: PortfolioItem[]) {
-  const portfolioWithUser = { ...portfolio, user_id: '123e4567-e89b-12d3-a456-426614174000' };
+  const portfolioWithUser = { ...portfolio, user_id: '123e4567-e89b-12d3-a456-426614174000', total_asset: portfolio.total_asset };
 
   const { data: portfolioData, error: portfolioError } = await supabase
     .from('portfolios')

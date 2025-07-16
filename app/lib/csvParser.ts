@@ -72,6 +72,7 @@ export function parseRakutenCsv(text: string): { portfolio: PortfolioItem[], tot
             gain_loss: parseFloat((obj["評価損益［円］"] || "0").replace(/,/g, "")),
             currency: "JPY",
             position_type: "cash",
+            current_price: parseFloat((obj["現在値［円］"] || "0").replace(/,/g, "")),
         };
     });
     
@@ -99,6 +100,7 @@ function parseMoomooCsv(text: string, fileName: string): { portfolio: PortfolioI
         gain_loss: parseFloat((row["損益"] || "0").replace(/,/g, "")),
         currency: row["通貨"] === "JPY" ? "JPY" : "USD",
         position_type: positionType,
+        current_price: parseFloat((row["現在値"] || "0").replace(/,/g, "")),
     }));
 
     const totalAsset = portfolio.reduce((sum, item) => sum + item.value, 0);
