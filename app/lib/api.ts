@@ -31,3 +31,12 @@ export async function fetchPortfolio(date: string): Promise<{ items: PortfolioIt
   }
   return await res.json();
 }
+
+export async function fetchLatestPortfolio(): Promise<{ items: PortfolioItem[], totalAsset: number }> {
+  const res = await fetch('/api/portfolio/latest');
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || '最新データの取得に失敗しました');
+  }
+  return await res.json();
+}

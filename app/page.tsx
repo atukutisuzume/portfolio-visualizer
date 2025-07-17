@@ -3,10 +3,12 @@ import { useState } from "react";
 import TabNavigation from "@/components/TabNavigation";
 import UploadTab from "@/components/UploadTab";
 import PortfolioTab from "@/components/PortfolioTab";
+import TableTab from "@/components/TableTab";
 
 const tabs = [
   { id: 'upload', label: 'アップロード' },
-  { id: 'portfolio', label: 'ポートフォリオ' }
+  { id: 'portfolio', label: 'ポートフォリオ' },
+  { id: 'table', label: '上昇率' }
 ];
 
 export default function Home() {
@@ -28,6 +30,7 @@ export default function Home() {
 
         {activeTab === 'upload' && <UploadTab />}
         {activeTab === 'portfolio' && <PortfolioTab />}
+        {activeTab === 'table' && <TableTab />}
       </div>
     </main>
   );
