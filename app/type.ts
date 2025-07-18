@@ -33,3 +33,21 @@ export interface PortfolioItem {
   current_price?: number;
   created_at?: string;
 }
+
+export interface TradeHistory {
+  id?: string;
+  user_id?: string;
+  trade_date: string;
+  symbol: string;
+  name: string;
+  market?: string;
+  account_type?: string;
+  trade_type?: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  amount: number;
+  currency: "JPY" | "USD";
+  source: string;
+  created_at?: string;
+}
