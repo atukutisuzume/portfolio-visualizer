@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { StockDataItem } from '@/hooks/useStockData';
 
 interface Props {
@@ -19,7 +19,52 @@ const getChangeColor = (value: number | null): string => {
   return value >= 0 ? 'text-green-600' : 'text-red-600';
 };
 
+type SortableKey = 'name' | 'holdingRate' | 'oneDayChange' | 'twoWeeksChange' | 'oneMonthChange';
+
 export default function PortfolioTable({ stockData, isLoading, error }: Props) {
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKey; direction: 'ascending' | 'descending' } | null>(null);
+
+  const sortedStockData = useMemo(() => {
+    let sortableItems = [...stockData];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+
+        // Always push nulls to the end
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+
+        const direction = sortConfig.direction === 'ascending' ? 1 : -1;
+
+        switch (typeof aValue) {
+          case 'number':
+            return (aValue - (bValue as number)) * direction;
+          case 'string':
+            return aValue.localeCompare(bValue as string) * direction;
+          default:
+            return 0;
+        }
+      });
+    }
+    return sortableItems;
+  }, [stockData, sortConfig]);
+
+  const requestSort = (key: SortableKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIndicator = (key: SortableKey) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return null;
+    }
+    return sortConfig.direction === 'ascending' ? '▲' : '▼';
+  };
+
   if (error) {
     return (
       <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded shadow">
@@ -63,25 +108,40 @@ export default function PortfolioTable({ stockData, isLoading, error }: Props) {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                銘柄名
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort('name')}
+              >
+                銘柄名 {getSortIndicator('name')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                保有率
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort('holdingRate')}
+              >
+                保有率 {getSortIndicator('holdingRate')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                前日比
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort('oneDayChange')}
+              >
+                前日比 {getSortIndicator('oneDayChange')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                2週間前比
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort('twoWeeksChange')}
+              >
+                2週間前比 {getSortIndicator('twoWeeksChange')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                1ヶ月前比
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                onClick={() => requestSort('oneMonthChange')}
+              >
+                1ヶ月前比 {getSortIndicator('oneMonthChange')}
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {stockData.map((item, index) => (
+            {sortedStockData.map((item, index) => (
               <tr key={`${item.code}-${index}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div>
