@@ -63,24 +63,7 @@ export async function GET() {
 
     const sortedItems = [...processedItems].sort((a, b) => b.value - a.value);
 
-    let finalDisplayItems: PortfolioItem[] = [];
-    if (sortedItems.length > 15) {
-      finalDisplayItems = sortedItems.slice(0, 15);
-      const otherValue = sortedItems.slice(15).reduce((sum, item) => sum + item.value, 0);
-      finalDisplayItems.push({
-        code: "OTHER",
-        name: "その他",
-        quantity: 0,
-        price: 0,
-        value: otherValue,
-        average_price: 0,
-        gain_loss: 0,
-        currency: "JPY",
-        position_type: "cash",
-      });
-    } else {
-      finalDisplayItems = sortedItems;
-    }
+    const finalDisplayItems: PortfolioItem[] = sortedItems;
 
     // 5. マージしたデータを返す
     return NextResponse.json({
