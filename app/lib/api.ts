@@ -1,4 +1,5 @@
 import { Portfolio, PortfolioItem } from '@/type';
+import { ProfitLossRecord } from './profitLossCalculator';
 
 export async function fetchAvailableDates(): Promise<string[]> {
   const res = await fetch('/api/portfolio/dates');
@@ -40,3 +41,30 @@ export async function fetchLatestPortfolio(): Promise<{ items: PortfolioItem[], 
   }
   return await res.json();
 }
+
+export const importTradeHistory = async (file: File, source: string): Promise<any> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('source', source);
+
+  const response = await fetch('/api/trades/import', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || '取引履歴のインポートに失敗しました');
+  }
+
+  return response.json();
+};
+
+export const fetchProfitLoss = async (yearMonth: string): Promise<ProfitLossRecord[]> => {
+  const response = await fetch(`/api/trades/profit-loss?yearMonth=${yearMonth}`);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || '損益データの取得に失敗しました');
+  }
+  return response.json();
+};

@@ -4,11 +4,13 @@ import TabNavigation from "@/components/TabNavigation";
 import UploadTab from "@/components/UploadTab";
 import PortfolioTab from "@/components/PortfolioTab";
 import TableTab from "@/components/TableTab";
+import ProfitLossTab from "@/components/ProfitLossTab"; // 新しくインポート
 
 const tabs = [
   { id: 'upload', label: 'アップロード' },
   { id: 'portfolio', label: 'ポートフォリオ' },
-  { id: 'table', label: '上昇率' }
+  { id: 'table', label: '上昇率' },
+  { id: 'profit-loss', label: '損益レポート' } // 新しいタブを追加
 ];
 
 export default function Home() {
@@ -31,6 +33,7 @@ export default function Home() {
         {activeTab === 'upload' && <UploadTab />}
         {activeTab === 'portfolio' && <PortfolioTab />}
         {activeTab === 'table' && <TableTab />}
+        {activeTab === 'profit-loss' && <ProfitLossTab />} {/* 新しいコンポーネントを表示 */}
       </div>
     </main>
   );
