@@ -45,7 +45,38 @@ export async function GET(request: Request) {
       allProfitLosses = allProfitLosses.concat(profitLosses);
     }
 
-    return NextResponse.json(allProfitLosses);
+    // 4. 銘柄ごとに損益を集計
+    const summary = allProfitLosses.reduce((acc, record) => {
+      const { symbol, name, quantity, sellPrice, avgBuyPrice, profitLoss, currency } = record;
+      if (!acc[symbol]) {
+        acc[symbol] = {
+          symbol,
+          name,
+          totalQuantity: 0,
+          totalSellValue: 0,
+          totalBuyValue: 0,
+          totalProfitLoss: 0,
+          currency,
+        };
+      }
+      acc[symbol].totalQuantity += quantity;
+      acc[symbol].totalSellValue += sellPrice * quantity;
+      acc[symbol].totalBuyValue += avgBuyPrice * quantity;
+      acc[symbol].totalProfitLoss += profitLoss;
+      return acc;
+    }, {});
+
+    const summarizedProfitLoss = Object.values(summary).map((s: any) => ({
+      symbol: s.symbol,
+      name: s.name,
+      quantity: s.totalQuantity,
+      avgSellPrice: s.totalSellValue / s.totalQuantity,
+      avgBuyPrice: s.totalBuyValue / s.totalQuantity,
+      profitLoss: s.totalProfitLoss,
+      currency: s.currency,
+    }));
+
+    return NextResponse.json(summarizedProfitLoss);
 
   } catch (error) {
     console.error('Profit/loss calculation error:', error);

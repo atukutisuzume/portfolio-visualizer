@@ -3,10 +3,20 @@
 "use client";
 
 import React from 'react';
-import { ProfitLossRecord } from '@/lib/profitLossCalculator';
+
+// APIから返される集計後のデータ型
+interface SummarizedProfitLossRecord {
+  symbol: string;
+  name: string;
+  quantity: number;
+  avgSellPrice: number;
+  avgBuyPrice: number;
+  profitLoss: number;
+  currency: string;
+}
 
 interface Props {
-  data: ProfitLossRecord[];
+  data: SummarizedProfitLossRecord[];
   isLoading: boolean;
   error: string | null;
 }
@@ -40,11 +50,10 @@ export default function ProfitLossTable({ data, isLoading, error }: Props) {
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">銘柄</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">売却日</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">売却数</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">売却単価</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">取得単価</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">損益</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">総売却数</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">平均売却単価</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">平均取得単価</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">実現損益</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">通貨</th>
           </tr>
         </thead>
@@ -55,9 +64,8 @@ export default function ProfitLossTable({ data, isLoading, error }: Props) {
                 <div className="text-sm font-medium text-gray-900">{record.name}</div>
                 <div className="text-sm text-gray-500">{record.symbol}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{record.sellDate}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{record.quantity}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(record.sellPrice)}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(record.avgSellPrice)}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{formatNumber(record.avgBuyPrice)}</td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${getProfitLossColor(record.profitLoss)}`}>
                 {formatNumber(record.profitLoss)}
