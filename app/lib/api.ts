@@ -60,8 +60,23 @@ export const importTradeHistory = async (file: File, source: string): Promise<an
   return response.json();
 };
 
-export const fetchProfitLoss = async (yearMonth: string): Promise<ProfitLossRecord[]> => {
-  const response = await fetch(`/api/trades/profit-loss?yearMonth=${yearMonth}`);
+interface ProfitLossSummaryData {
+  totalProfitLoss: number;
+  winRate: number;
+  payoffRatio: number;
+}
+
+interface ProfitLossSummary {
+  [currency: string]: ProfitLossSummaryData;
+}
+
+export interface ProfitLossResponse {
+  records: ProfitLossRecord[];
+  summary: ProfitLossSummary;
+}
+
+export const fetchProfitLoss = async (period: string): Promise<ProfitLossResponse> => {
+  const response = await fetch(`/api/trades/profit-loss?period=${period}`);
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || '損益データの取得に失敗しました');

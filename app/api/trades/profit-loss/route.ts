@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { calculateProfitLoss, Trade } from '@/lib/profitLossCalculator';
+import { calculateProfitLoss, Trade, ProfitLossRecord, ProfitLossSummary } from '@/lib/profitLossCalculator';
 
 // 他のAPIと同様に、認証をシンプルにするため固定のクライアントとユーザーIDを使用
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
@@ -11,10 +11,10 @@ const FAKE_USER_ID = '123e4567-e89b-12d3-a456-426614174000'; // import APIと同
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const yearMonth = searchParams.get('yearMonth'); // 例: '2024-07'
+  const period = searchParams.get('period'); // 例: '2024-07', '2024', 'all'
 
-  if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
-    return NextResponse.json({ error: '年月を YYYY-MM 形式で指定してください' }, { status: 400 });
+  if (!period) {
+    return NextResponse.json({ error: '期間を指定してください' }, { status: 400 });
   }
 
   try {
@@ -37,16 +37,35 @@ export async function GET(request: Request) {
       return acc;
     }, {});
 
-    // 3. グループごとに損益を計算
-    let allProfitLosses: any[] = [];
+    // 3. グループごとに損益を計算し、通貨ごとに結果を集約
+    let allProfitLossRecords: ProfitLossRecord[] = [];
+    const summaryByCurrency: Record<string, any> = {};
+
     for (const key in tradesByGroup) {
       const groupTrades = tradesByGroup[key];
-      const profitLosses = calculateProfitLoss(groupTrades, yearMonth);
-      allProfitLosses = allProfitLosses.concat(profitLosses);
+      const summary: ProfitLossSummary = calculateProfitLoss(groupTrades, period);
+      const currency = groupTrades[0].currency; // グループの通貨
+
+      if (!summaryByCurrency[currency]) {
+        summaryByCurrency[currency] = {
+          totalProfitLoss: 0,
+          totalWins: 0,
+          totalLosses: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+        };
+      }
+
+      allProfitLossRecords.push(...summary.records);
+      summaryByCurrency[currency].totalProfitLoss += summary.totalProfitLoss;
+      summaryByCurrency[currency].totalWins += summary.totalWins;
+      summaryByCurrency[currency].totalLosses += summary.totalLosses;
+      summaryByCurrency[currency].winningTrades += summary.winningTrades;
+      summaryByCurrency[currency].losingTrades += summary.losingTrades;
     }
 
     // 4. 銘柄ごとに損益を集計
-    const summary = allProfitLosses.reduce((acc, record) => {
+    const summaryBySymbol = allProfitLossRecords.reduce<Record<string, any>>((acc, record) => {
       const { symbol, name, quantity, sellPrice, avgBuyPrice, profitLoss, currency } = record;
       if (!acc[symbol]) {
         acc[symbol] = {
@@ -66,7 +85,7 @@ export async function GET(request: Request) {
       return acc;
     }, {});
 
-    const summarizedProfitLoss = Object.values(summary).map((s: any) => ({
+    const summarizedProfitLoss = Object.values(summaryBySymbol).map((s: any) => ({
       symbol: s.symbol,
       name: s.name,
       quantity: s.totalQuantity,
@@ -76,7 +95,28 @@ export async function GET(request: Request) {
       currency: s.currency,
     }));
 
-    return NextResponse.json(summarizedProfitLoss);
+    // 5. 通貨ごとの最終サマリーを計算
+    const finalSummary: Record<string, any> = {};
+    for (const currency in summaryByCurrency) {
+      const data = summaryByCurrency[currency];
+      const winRate = (data.winningTrades + data.losingTrades) > 0 ? data.winningTrades / (data.winningTrades + data.losingTrades) : 0;
+      const avgWin = data.winningTrades > 0 ? data.totalWins / data.winningTrades : 0;
+      const avgLoss = data.losingTrades > 0 ? Math.abs(data.totalLosses / data.losingTrades) : 0;
+      const payoffRatio = avgLoss > 0 ? avgWin / avgLoss : 0;
+
+      finalSummary[currency] = {
+        totalProfitLoss: data.totalProfitLoss,
+        winRate,
+        payoffRatio,
+      };
+    }
+
+    const response = {
+      records: summarizedProfitLoss,
+      summary: finalSummary,
+    };
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Profit/loss calculation error:', error);

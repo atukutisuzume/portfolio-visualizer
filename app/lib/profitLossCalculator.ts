@@ -26,27 +26,44 @@ export interface ProfitLossRecord {
   currency: string;
 }
 
+// 損益サマリーの型
+export interface ProfitLossSummary {
+  records: ProfitLossRecord[];
+  totalProfitLoss: number;
+  winRate: number;
+  payoffRatio: number;
+  totalWins: number;
+  totalLosses: number;
+  winningTrades: number;
+  losingTrades: number;
+}
+
 /**
  * FIFO方式で株式の売却損益を計算する
  * @param trades - 特定の銘柄、口座、通貨の全取引履歴（日付昇順）
- * @param targetYearMonth - 計算対象の年月 (例: '2024-07')
- * @returns 指定した年月の売却に対する損益レコードの配列
+ * @param period - 計算対象の期間 (例: '2024-07', '2024', 'all')
+ * @returns 指定した期間の売却に対する損益レコードの配列とサマリー
  */
 export const calculateProfitLoss = (
   trades: Trade[],
-  targetYearMonth: string
-): ProfitLossRecord[] => {
+  period: string
+): ProfitLossSummary => {
   const buys = trades
     .filter((t) => t.side === 'buy')
     .map(t => ({ ...t, remaining: t.quantity })); // 残量を追跡
-  
-  const sells = trades.filter(
-    (t) =>
-      t.side === 'sell' &&
-      t.trade_date.startsWith(targetYearMonth)
-  );
+
+  const sells = trades.filter((t) => {
+    if (t.side !== 'sell') return false;
+    if (period === 'all') return true;
+    return t.trade_date.startsWith(period);
+  });
 
   const profitLossRecords: ProfitLossRecord[] = [];
+  let totalProfitLoss = 0;
+  let totalWins = 0;
+  let totalLosses = 0;
+  let winningTrades = 0;
+  let losingTrades = 0;
 
   for (const sell of sells) {
     let sellQuantityRemaining = sell.quantity;
@@ -75,8 +92,20 @@ export const calculateProfitLoss = (
       // 不足分は取得単価0として計算を続ける
     }
 
-    const avgBuyPrice = totalCostOfBuys / (sell.quantity - sellQuantityRemaining);
+    const denominator = sell.quantity - sellQuantityRemaining;
+    const avgBuyPrice = denominator > 0 ? totalCostOfBuys / denominator : 0;
     const profitLoss = (sell.price - avgBuyPrice) * sell.quantity;
+
+    if (Number.isFinite(profitLoss)) {
+      if (profitLoss > 0) {
+        winningTrades++;
+        totalWins += profitLoss;
+      } else if (profitLoss < 0) {
+        losingTrades++;
+        totalLosses += profitLoss;
+      }
+      totalProfitLoss += profitLoss;
+    }
 
     profitLossRecords.push({
       symbol: sell.symbol,
@@ -84,11 +113,25 @@ export const calculateProfitLoss = (
       sellDate: sell.trade_date,
       quantity: sell.quantity,
       sellPrice: sell.price,
-      avgBuyPrice: isNaN(avgBuyPrice) ? 0 : avgBuyPrice,
-      profitLoss: isNaN(profitLoss) ? 0 : profitLoss,
+      avgBuyPrice: Number.isFinite(avgBuyPrice) ? avgBuyPrice : 0,
+      profitLoss: Number.isFinite(profitLoss) ? profitLoss : 0,
       currency: sell.currency,
     });
   }
 
-  return profitLossRecords;
+  const winRate = (winningTrades + losingTrades) > 0 ? winningTrades / (winningTrades + losingTrades) : 0;
+  const avgWin = winningTrades > 0 ? totalWins / winningTrades : 0;
+  const avgLoss = losingTrades > 0 ? Math.abs(totalLosses / losingTrades) : 0;
+  const payoffRatio = avgLoss > 0 ? avgWin / avgLoss : 0;
+
+  return {
+    records: profitLossRecords,
+    totalProfitLoss,
+    winRate,
+    payoffRatio,
+    totalWins,
+    totalLosses,
+    winningTrades,
+    losingTrades,
+  };
 };
