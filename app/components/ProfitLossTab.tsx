@@ -100,7 +100,12 @@ export default function ProfitLossTab() {
             <div className="bg-white p-4 rounded-lg shadow">
               <h3 className="text-sm font-medium text-gray-500">合計損益</h3>
               <p className={`text-2xl font-semibold ${summaryData.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {summaryData.totalProfitLoss.toLocaleString(undefined, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {summaryData.totalProfitLoss.toLocaleString(undefined, {
+                  style: 'currency',
+                  currency,
+                  minimumFractionDigits: currency === 'JPY' ? 0 : 2,
+                  maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+                })}
               </p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
