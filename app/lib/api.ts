@@ -83,3 +83,17 @@ export const fetchProfitLoss = async (period: string): Promise<ProfitLossRespons
   }
   return response.json();
 };
+
+export interface DailyData {
+  change: number;
+  totalAsset: number;
+}
+
+export const fetchDailyChanges = async (): Promise<Record<string, DailyData>> => {
+  const response = await fetch('/api/portfolio/daily-change');
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || '日次変動データの取得に失敗しました');
+  }
+  return response.json();
+};
