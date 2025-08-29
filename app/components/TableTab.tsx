@@ -23,7 +23,8 @@ export default function TableTab() {
       setError(null);
 
       try {
-        const { items, totalAsset } = await fetchLatestPortfolio();
+        const { items, totalAsset, date } = await fetchLatestPortfolio();
+        console.log(`[TableTab] Displaying data for date: ${date}`);
         setPortfolioData(items);
         setTotalAsset(totalAsset);
       } catch (err) {

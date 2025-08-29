@@ -11,8 +11,9 @@ export async function GET() {
     // 1. 最新のポートフォリオを取得
     const { data: portfolios, error: portfolioError } = await supabase
       .from("portfolios")
-      .select("id, total_asset, created_at")
-      .order("created_at", { ascending: false })
+      .select("id, total_asset, data_date")
+      .not("data_date", "is", null)
+      .order("data_date", { ascending: false })
       .limit(50); // 最新50件を取得して同じ日付のものをまとめる
 
     if (portfolioError) throw portfolioError;
@@ -22,10 +23,10 @@ export async function GET() {
     }
 
     // 最新の日付を取得
-    const latestDate = portfolios[0].created_at;
+    const latestDate = portfolios[0].data_date;
     
     // 最新の日付のポートフォリオをすべて取得
-    const latestPortfolios = portfolios.filter(p => p.created_at === latestDate);
+    const latestPortfolios = portfolios.filter(p => p.data_date === latestDate);
 
     // 2. 最新ポートフォリオのIDを使って、関連する銘柄をすべて取得
     const portfolioIds = latestPortfolios.map(p => p.id);
@@ -69,6 +70,7 @@ export async function GET() {
     return NextResponse.json({
       items: finalDisplayItems,
       totalAsset: totalAsset,
+      date: latestDate,
     }, { status: 200 });
 
   } catch (err: any) {

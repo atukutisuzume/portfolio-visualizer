@@ -23,15 +23,20 @@ export function useStockData(portfolioItems: PortfolioItem[], totalAsset: number
       return;
     }
 
+    console.log(`[useStockData] Calculating holding rates with totalAsset: ${totalAsset}`);
+
     const fetchStockData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
         const stockDataPromises = portfolioItems.map(async (item) => {
+          const holdingRate = (item.value / totalAsset) * 100;
+          console.log(`[useStockData] Item: ${item.name} (${item.code}), Value: ${item.value}, Currency: ${item.currency}, Calculated Holding Rate: ${holdingRate.toFixed(2)}%`);
+
           const stockDataItem: StockDataItem = {
             ...item,
-            holdingRate: (item.value / totalAsset) * 100,
+            holdingRate: holdingRate,
             oneDayChange: null,
             twoWeeksChange: null,
             oneMonthChange: null,

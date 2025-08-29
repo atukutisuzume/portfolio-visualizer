@@ -12,8 +12,8 @@ export async function GET(request: Request) { // Requestオブジェクトを受
   try {
     const { data, error } = await supabase
       .from("portfolios")
-      .select("created_at")
-      .order("created_at", { ascending: false });
+      .select("data_date")
+      .order("data_date", { ascending: false });
 
     if (error) {
       console.error("Supabase error:", error); // エラー詳細をログに出力
@@ -21,7 +21,7 @@ export async function GET(request: Request) { // Requestオブジェクトを受
     }
 
     // 取得した日付データから重複を除外してJSONレスポンスとして返す
-    const uniqueDates = [...new Set(data.map((d) => d.created_at))];
+    const uniqueDates = [...new Set(data.map((d) => d.data_date))];
     return NextResponse.json({ dates: uniqueDates });
 
   } catch (err: any) {

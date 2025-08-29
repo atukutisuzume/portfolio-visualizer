@@ -33,7 +33,7 @@ export async function fetchPortfolio(date: string): Promise<{ items: PortfolioIt
   return await res.json();
 }
 
-export async function fetchLatestPortfolio(): Promise<{ items: PortfolioItem[], totalAsset: number }> {
+export async function fetchLatestPortfolio(): Promise<{ items: PortfolioItem[], totalAsset: number, date: string }> {
   const res = await fetch('/api/portfolio/latest');
   if (!res.ok) {
     const data = await res.json();

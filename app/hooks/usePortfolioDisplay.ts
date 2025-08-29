@@ -14,15 +14,20 @@ export function usePortfolioDisplay() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const loadInitialData = async () => {
       try {
         const dates = await fetchAvailableDates();
         setAvailableDates(dates);
+        if (dates.length > 0) {
+          await handleDateSelect(dates[0]);
+        }
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : '日付履歴取得エラー');
       }
-    })();
+    };
+    loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDateSelect = async (date: string) => {

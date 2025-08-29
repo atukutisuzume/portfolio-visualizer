@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const { data: portfolios, error: portfolioError } = await supabase
       .from("portfolios")
       .select("id, total_asset")
-      .eq("created_at", date);
+      .eq("data_date", date);
 
     if (portfolioError) throw portfolioError;
 

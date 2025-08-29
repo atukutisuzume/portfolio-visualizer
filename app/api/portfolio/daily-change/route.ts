@@ -11,16 +11,16 @@ export async function GET() {
     // 1. ユーザーのポートフォリオ履歴を日付順に取得
     const { data: portfolios, error } = await supabase
       .from('portfolios')
-      .select('created_at, total_asset')
+      .select('data_date, total_asset')
       .eq('user_id', FAKE_USER_ID)
-      .order('created_at', { ascending: true });
+      .order('data_date', { ascending: true });
 
     if (error) throw error;
 
     // 2. 日付ごとに総資産を合算
     const dailyAssets = new Map<string, number>();
     portfolios.forEach(p => {
-      const date = new Date(p.created_at).toISOString().split('T')[0];
+      const date = new Date(p.data_date).toISOString().split('T')[0];
       const existingAsset = dailyAssets.get(date) || 0;
       dailyAssets.set(date, existingAsset + p.total_asset);
     });
