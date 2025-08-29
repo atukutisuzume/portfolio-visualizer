@@ -16,6 +16,7 @@ export interface Portfolio {
   broker: string;
   total_asset: number;
   created_at?: string;
+  data_date?: string;
 }
 
 export interface PortfolioItem {
@@ -32,6 +33,7 @@ export interface PortfolioItem {
   position_type?: "cash" | "margin";
   current_price?: number;
   created_at?: string;
+  data_date?: string;
 }
 
 export interface TradeHistory {

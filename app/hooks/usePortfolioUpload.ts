@@ -57,7 +57,7 @@ export function usePortfolioUpload() {
       const portfolio = {
         broker: brokerName,
         total_asset: Number(totalAsset),
-        created_at: selectedDate,
+        data_date: selectedDate, // created_at を data_date に変更
       };
 
       await savePortfolioWithItems(portfolio, currentPortfolioItems);

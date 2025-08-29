@@ -5,6 +5,8 @@ import { Portfolio, PortfolioItem } from '@/type';
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
 async function savePortfolioWithItems(portfolio: Portfolio, items: PortfolioItem[]) {
+  const { data_date } = portfolio; // data_dateを取得
+
   const portfolioWithUser = { ...portfolio, user_id: '123e4567-e89b-12d3-a456-426614174000', total_asset: portfolio.total_asset };
 
   const { data: portfolioData, error: portfolioError } = await supabase
@@ -20,7 +22,8 @@ async function savePortfolioWithItems(portfolio: Portfolio, items: PortfolioItem
 
   const portfolioId = portfolioData.id;
 
-  const itemsWithPortfolioId = items.map(item => ({ ...item, portfolio_id: portfolioId }));
+  // 各itemにportfolio_idとdata_dateを追加
+  const itemsWithPortfolioId = items.map(item => ({ ...item, portfolio_id: portfolioId, data_date: data_date }));
 
   const { error: itemsError } = await supabase
     .from('portfolio_items')
