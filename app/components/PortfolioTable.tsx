@@ -7,6 +7,7 @@ interface Props {
   stockData: StockDataItem[];
   isLoading: boolean;
   error: string | null;
+  isAmountVisible: boolean;
 }
 
 const formatPercentage = (value: number | null): string => {
@@ -21,7 +22,7 @@ const getChangeColor = (value: number | null): string => {
 
 type SortableKey = 'name' | 'holdingRate' | 'oneDayChange' | 'twoWeeksChange' | 'oneMonthChange';
 
-export default function PortfolioTable({ stockData, isLoading, error }: Props) {
+export default function PortfolioTable({ stockData, isLoading, error, isAmountVisible }: Props) {
   const [sortConfig, setSortConfig] = useState<{ key: SortableKey; direction: 'ascending' | 'descending' } | null>(null);
 
   const sortedStockData = useMemo(() => {
@@ -157,9 +158,11 @@ export default function PortfolioTable({ stockData, isLoading, error }: Props) {
                   <div className="text-sm text-gray-900">
                     {item.holdingRate.toFixed(2)}%
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {item.value.toLocaleString()}円
-                  </div>
+                  {isAmountVisible && (
+                    <div className="text-sm text-gray-500">
+                      {item.value.toLocaleString()}円
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {item.isLoading ? (

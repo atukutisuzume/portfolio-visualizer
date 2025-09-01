@@ -11,6 +11,7 @@ export default function TableTab() {
   const [totalAsset, setTotalAsset] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAmountVisible, setIsAmountVisible] = useState(true);
 
   const { stockData, isLoading: stockLoading, error: stockError } = useStockData(
     portfolioData,
@@ -46,11 +47,25 @@ export default function TableTab() {
       )}
 
       {portfolioData.length > 0 && (
-        <PortfolioTable
-          stockData={stockData}
-          isLoading={stockLoading || isLoading}
-          error={stockError}
-        />
+        <div>
+          <div className="flex justify-end items-center mb-4">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAmountVisible}
+                onChange={() => setIsAmountVisible(!isAmountVisible)}
+                className="form-checkbox h-5 w-5 text-indigo-600 rounded focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">金額を表示</span>
+            </label>
+          </div>
+          <PortfolioTable
+            stockData={stockData}
+            isLoading={stockLoading || isLoading}
+            error={stockError}
+            isAmountVisible={isAmountVisible}
+          />
+        </div>
       )}
 
       {portfolioData.length === 0 && !isLoading && !error && (
