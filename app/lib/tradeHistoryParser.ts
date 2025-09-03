@@ -17,7 +17,7 @@ export async function parseTradeHistoryCsv(file: File): Promise<{ trades: TradeH
         });
         text = Encoding.codeToString(unicodeArray);
     }
-
+    console.log("start parseTradeHistoryText")
     const result = parseTradeHistoryText(text, file.name);
     if (!result || result.trades.length === 0) {
         throw new Error("未知の取引履歴CSVフォーマットです。楽天証券またはmoomoo証券の取引履歴CSVをアップロードしてください。");
@@ -28,11 +28,13 @@ export async function parseTradeHistoryCsv(file: File): Promise<{ trades: TradeH
 function parseTradeHistoryText(text: string, fileName: string): { trades: TradeHistory[], source: string } {
     // 楽天証券の取引履歴を判定
     if (text.includes("約定日,受渡日,銘柄コード")) {
+        console.log("==rakuten start==")
         return parseRakutenTradeHistory(text);
     }
     
     // moomoo取引履歴を判定
     if (text.includes('"売買方向","銘柄コード","銘柄名"')) {
+        console.log("==moomoo start==")
         const isMargin = fileName.includes("信用") || text.includes("信用区分");
         return parseMoomooTradeHistory(text, isMargin);
     }
@@ -79,17 +81,31 @@ function parseRakutenTradeHistory(text: string): { trades: TradeHistory[], sourc
 }
 
 function parseMoomooTradeHistory(text: string, isMargin: boolean): { trades: TradeHistory[], source: string } {
+    console.log("==parseMoomooTradeHistory:papa start==")
+    let seen = new Set();
     const data = Papa.parse<any>(text, {
         header: true,
-        skipEmptyLines: true
+        skipEmptyLines: true,
+        // transformHeader: function(h) {
+        //     if (seen.has(h)) return null; // 重複は無視
+        //     seen.add(h);
+        //     return h;
+        // }
     });
+    console.log("==parseMoomooTradeHistory:papa end==")
+    console.log(`parseMoomooTradeHistory:data: ${data}`)
+    console.log(`parseMoomooTradeHistory:key: ${Object.keys(data.data)}`)
+    
 
     const trades: TradeHistory[] = data.data
         .filter((row: any) => {
             // 約定済みの取引のみを対象とする
-            return row["取引状況"] === "約定済" && row["約定日時"] && row["銘柄コード"];
+            // console.log(`parseMoomooTradeHistory:取引状況: ${row["取引状況"]}`)
+            // console.log(`parseMoomooTradeHistory:注文状況: ${row["注文状況"]}`)
+            return (row["取引状況"] === "約定済" || row["注文状況"] === "約定済") && row["約定日時"] && row["銘柄コード"];
         })
         .map((row: any) => {
+            console.log("==parseMoomooTradeHistory:map now==")
             const tradeDate = parseMoomooDate(row["約定日時"]);
             const side = determineMoomooSide(row["売買方向"]);
             const quantity = parseFloat(row["約定数量"] || "0");
@@ -115,7 +131,8 @@ function parseMoomooTradeHistory(text: string, isMargin: boolean): { trades: Tra
                 source: "moomoo"
             } as TradeHistory;
         });
-
+        
+    console.log(`parseMoomooTradeHistory:trades: ${trades}`)
     return { trades, source: "moomoo" };
 }
 
