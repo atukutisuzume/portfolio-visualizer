@@ -97,3 +97,17 @@ export const fetchDailyChanges = async (): Promise<Record<string, DailyData>> =>
   }
   return response.json();
 };
+
+export interface MonthlyCompositionData {
+  date: string;
+  [key: string]: string | number;
+}
+
+export const fetchMonthlyComposition = async (month: string): Promise<MonthlyCompositionData[]> => {
+  const response = await fetch(`/api/portfolio/monthly-composition?month=${month}`);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || '月次構成データの取得に失敗しました');
+  }
+  return response.json();
+};
