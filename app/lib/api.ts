@@ -73,6 +73,7 @@ interface ProfitLossSummary {
 export interface ProfitLossResponse {
   records: ProfitLossRecord[];
   summary: ProfitLossSummary;
+  monthlySummary?: Record<string, number>;
 }
 
 export const fetchProfitLoss = async (period: string): Promise<ProfitLossResponse> => {

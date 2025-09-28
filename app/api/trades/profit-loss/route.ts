@@ -1,4 +1,3 @@
-
 // app/api/trades/profit-loss/route.ts
 
 import { NextResponse } from 'next/server';
@@ -111,10 +110,23 @@ export async function GET(request: Request) {
       };
     }
 
-    const response = {
+    const response: any = {
       records: summarizedProfitLoss,
       summary: finalSummary,
     };
+
+    // 6. 全期間が指定された場合、月次サマリーを追加
+    if (period === 'all') {
+      const monthlySummary = allProfitLossRecords.reduce((acc, record) => {
+        const month = record.sellDate.slice(0, 7); // "YYYY-MM"
+        if (!acc[month]) {
+          acc[month] = 0;
+        }
+        acc[month] += record.profitLoss;
+        return acc;
+      }, {} as Record<string, number>);
+      response.monthlySummary = monthlySummary;
+    }
 
     return NextResponse.json(response);
 

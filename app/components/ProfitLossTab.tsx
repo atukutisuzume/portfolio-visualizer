@@ -1,4 +1,3 @@
-
 // components/ProfitLossTab.tsx
 "use client";
 
@@ -6,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchProfitLoss } from '@/lib/api';
 import { ProfitLossRecord } from '@/lib/profitLossCalculator';
 import ProfitLossTable from './ProfitLossTable';
+import MonthlyProfitLossChart from './MonthlyProfitLossChart'; // 追加
 
 interface ProfitLossSummaryData {
   totalProfitLoss: number;
@@ -23,6 +23,7 @@ export default function ProfitLossTab() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [data, setData] = useState<ProfitLossRecord[]>([]);
   const [summary, setSummary] = useState<ProfitLossSummary | null>(null);
+  const [monthlySummary, setMonthlySummary] = useState<Record<string, number> | null>(null); // 追加
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,10 +39,15 @@ export default function ProfitLossTab() {
 
     setIsLoading(true);
     setError(null);
+    setMonthlySummary(null); // 取得前にクリア
     try {
       const result = await fetchProfitLoss(period);
+      console.log("[ProfitLossTab] API Response:", result); // ログ追加
       setData(result.records);
       setSummary(result.summary);
+      if (result.monthlySummary) {
+        setMonthlySummary(result.monthlySummary);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'データの取得に失敗しました');
     } finally {
@@ -51,7 +57,10 @@ export default function ProfitLossTab() {
 
   useEffect(() => {
     handleFetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 初回読み込み
+
+  console.log(`[ProfitLossTab] Rendering check: periodType is "${periodType}", monthlySummary is`, monthlySummary);
 
   return (
     <div className="space-y-6">
@@ -123,6 +132,10 @@ export default function ProfitLossTab() {
           </div>
         </div>
       ))}
+
+      {periodType === 'all' && monthlySummary && (
+        <MonthlyProfitLossChart data={monthlySummary} />
+      )}
 
       <div className="bg-white p-6 rounded-lg shadow">
         <ProfitLossTable data={data} isLoading={isLoading} error={error} />
