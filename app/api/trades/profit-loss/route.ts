@@ -4,27 +4,58 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { calculateProfitLoss, Trade, ProfitLossRecord, ProfitLossSummary } from '@/lib/profitLossCalculator';
 
-// 他のAPIと同様に、認証をシンプルにするため固定のクライアントとユーザーIDを使用
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-const FAKE_USER_ID = '123e4567-e89b-12d3-a456-426614174000'; // import APIと同樣の固定値
+const FAKE_USER_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+// ページネーションを使って全取引履歴を取得するヘルパー関数
+async function fetchAllTrades(userId: string): Promise<Trade[]> {
+  const PAGE_SIZE = 1000;
+  let allTrades: Trade[] = [];
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('trade_history')
+      .select('id, trade_date, symbol, name, side, quantity, price, currency, account_type')
+      .eq('user_id', userId)
+      .order('trade_date', { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      console.error(`[API] Error fetching trades on page ${page}:`, error);
+      throw error;
+    }
+
+    if (data) {
+      allTrades = allTrades.concat(data as Trade[]);
+    }
+
+    if (!data || data.length < PAGE_SIZE) {
+      hasMore = false;
+    } else {
+      page++;
+    }
+  }
+  console.log(`[API] Total trades fetched from DB: ${allTrades.length}`);
+  return allTrades;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const period = searchParams.get('period'); // 例: '2024-07', '2024', 'all'
+  const period = searchParams.get('period');
+  console.log(`[API] Received request for period: ${period}`);
 
   if (!period) {
     return NextResponse.json({ error: '期間を指定してください' }, { status: 400 });
   }
 
   try {
-    // 1. 関連する全取引履歴を取得
-    const { data: trades, error } = await supabase
-      .from('trade_history')
-      .select('id, trade_date, symbol, name, side, quantity, price, currency, account_type')
-      .eq('user_id', FAKE_USER_ID) // 固定のユーザーIDでフィルタリング
-      .order('trade_date', { ascending: true });
-
-    if (error) throw error;
+    // 1. ページネーションですべての取引履歴を取得
+    const trades = await fetchAllTrades(FAKE_USER_ID);
 
     // 2. 銘柄ごと、口座ごと、通貨ごとに取引をグループ化
     const tradesByGroup = trades.reduce<Record<string, Trade[]>>((acc, trade) => {
@@ -43,7 +74,8 @@ export async function GET(request: Request) {
     for (const key in tradesByGroup) {
       const groupTrades = tradesByGroup[key];
       const summary: ProfitLossSummary = calculateProfitLoss(groupTrades, period);
-      const currency = groupTrades[0].currency; // グループの通貨
+      const currency = groupTrades[0]?.currency;
+      if (!currency) continue;
 
       if (!summaryByCurrency[currency]) {
         summaryByCurrency[currency] = {
@@ -128,6 +160,7 @@ export async function GET(request: Request) {
       response.monthlySummary = monthlySummary;
     }
 
+    console.log(`[API] Sending final response with ${response.records.length} records.`);
     return NextResponse.json(response);
 
   } catch (error) {

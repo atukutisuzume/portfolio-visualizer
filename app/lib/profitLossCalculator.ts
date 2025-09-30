@@ -58,6 +58,8 @@ export const calculateProfitLoss = (
     return t.trade_date.startsWith(period);
   });
 
+  console.log(`[Calculator] Processing ${trades.length} trades for period "${period}". Found ${sells.length} sell trades to calculate.`);
+
   const profitLossRecords: ProfitLossRecord[] = [];
   let totalProfitLoss = 0;
   let totalWins = 0;
@@ -88,8 +90,7 @@ export const calculateProfitLoss = (
 
     if (sellQuantityRemaining > 0) {
       // 対応する購入履歴が不足している場合
-      console.warn(`警告: ${sell.symbol} の売却に対応する購入履歴が不足しています。`);
-      // 不足分は取得単価0として計算を続ける
+      // console.warn(`[Calculator] Warning: Not enough buy history for sell of ${sell.symbol}.`);
     }
 
     const denominator = sell.quantity - sellQuantityRemaining;
