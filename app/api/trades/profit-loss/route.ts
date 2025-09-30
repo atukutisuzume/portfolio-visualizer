@@ -154,7 +154,13 @@ export async function GET(request: Request) {
         if (!acc[month]) {
           acc[month] = 0;
         }
-        acc[month] += record.profitLoss;
+        
+        let profitLoss = record.profitLoss;
+        if (record.currency === 'USD') {
+          profitLoss *= 145; // USDをJPYに換算
+        }
+        acc[month] += profitLoss;
+
         return acc;
       }, {} as Record<string, number>);
       response.monthlySummary = monthlySummary;
