@@ -64,7 +64,7 @@ export default function MonthlySymbolProfitLossTab() {
           throw new Error('サーバーからの応答が不正です。');
         }
         const result = await response.json();
-        setData(result.results);
+        setData(result.results || []);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'データの取得に失敗しました。');
         setData([]);
@@ -75,6 +75,19 @@ export default function MonthlySymbolProfitLossTab() {
 
     fetchData();
   }, [selectedMonth]);
+
+  const { positiveContribution, negativeContribution } = useMemo(() => {
+    if (!data) return { positiveContribution: 0, negativeContribution: 0 };
+
+    return data.reduce((acc, item) => {
+      if (item.plPercentage > 0) {
+        acc.positiveContribution += item.plPercentage;
+      } else if (item.plPercentage < 0) {
+        acc.negativeContribution += item.plPercentage;
+      }
+      return acc;
+    }, { positiveContribution: 0, negativeContribution: 0 });
+  }, [data]);
 
   return (
     <div className="p-4 md:p-6">
@@ -107,6 +120,25 @@ export default function MonthlySymbolProfitLossTab() {
         </div>
 
         {error && <div className="text-red-500 bg-red-100 p-4 rounded-md">エラー: {error}</div>}
+
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex justify-around items-center">
+                <div className="text-center">
+                    <h4 className="text-sm font-medium text-gray-500">プラス貢献度 合計</h4>
+                    <p className="text-2xl font-bold text-green-600 mt-1">+{ (positiveContribution * 100).toFixed(2) }%</p>
+                </div>
+                <div className="text-center">
+                    <h4 className="text-sm font-medium text-gray-500">マイナス貢献度 合計</h4>
+                    <p className="text-2xl font-bold text-red-600 mt-1">{ (negativeContribution * 100).toFixed(2) }%</p>
+                </div>
+                <div className="text-center">
+                    <h4 className="text-sm font-medium text-gray-500">月次リターン</h4>
+                    <p className={`text-2xl font-bold mt-1 ${(positiveContribution + negativeContribution) >= 0 ? 'text-blue-700' : 'text-pink-700'}`}>
+                        { ((positiveContribution + negativeContribution) * 100).toFixed(2) }%
+                    </p>
+                </div>
+            </div>
+        </div>
 
         <MonthlySymbolProfitLossTable data={data} isLoading={isLoading} isAmountVisible={isAmountVisible} />
     </div>

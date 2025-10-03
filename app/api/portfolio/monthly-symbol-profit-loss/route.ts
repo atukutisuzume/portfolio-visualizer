@@ -28,7 +28,11 @@ export async function GET(request: Request) {
 
     try {
         const { firstDay, lastDay } = getMonthRange(month);
-        console.log(`[API DEBUG] Calculating for month: ${month} (${firstDay} to ${lastDay})`);
+        const [year, monthIndex] = month.split('-').map(Number);
+        const endOfPreviousMonth = new Date(Date.UTC(year, monthIndex - 1, 0));
+        const endOfPreviousMonthStr = endOfPreviousMonth.toISOString().split('T')[0];
+
+        console.log(`[API DEBUG] Calculating for month: ${month} (Base Date: ${endOfPreviousMonthStr}, End Date: ${lastDay})`);
 
         // 1. 必要なデータを並行して取得
         const [
@@ -36,15 +40,14 @@ export async function GET(request: Request) {
             { data: portfolioEndRaw, error: errorEnd },
             { data: trades, error: errorTrades }
         ] = await Promise.all([
-            // 月初以降で最も古いデータを取得するため、月全体のデータを日付昇順で取得
+            // 前月の最終日以前で最も新しいデータを取得
             supabase.from('portfolio_items')
                 .select('code, name, quantity, price, currency, value')
-                .gte('data_date', firstDay)
-                .lte('data_date', lastDay)
-                .order('data_date', { ascending: true }),
+                .lte('data_date', endOfPreviousMonthStr)
+                .order('data_date', { ascending: false }),
             // 月末以前で最も新しいデータを取得するため、月全体のデータを日付降順で取得
             supabase.from('portfolio_items')
-                .select('code, quantity, price, currency, value') // valueを追加
+                .select('code, quantity, price, currency, value')
                 .gte('data_date', firstDay)
                 .lte('data_date', lastDay)
                 .order('data_date', { ascending: false }),
