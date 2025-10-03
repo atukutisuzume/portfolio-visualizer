@@ -38,7 +38,7 @@ export default function MonthlySymbolProfitLossTab() {
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [monthOptions, setMonthOptions] = useState<string[]>([]);
-  const [isAmountVisible, setIsAmountVisible] = useState(true);
+  const [isAmountVisible, setIsAmountVisible] = useState(false);
 
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<HistoryData[]>([]);
