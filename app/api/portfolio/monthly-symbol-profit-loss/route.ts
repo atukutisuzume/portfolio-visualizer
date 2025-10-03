@@ -38,17 +38,17 @@ export async function GET(request: Request) {
         ] = await Promise.all([
             // 月初以降で最も古いデータを取得するため、月全体のデータを日付昇順で取得
             supabase.from('portfolio_items')
-                .select('code, name, quantity, price')
+                .select('code, name, quantity, price, currency, value')
                 .gte('data_date', firstDay)
                 .lte('data_date', lastDay)
                 .order('data_date', { ascending: true }),
             // 月末以前で最も新しいデータを取得するため、月全体のデータを日付降順で取得
             supabase.from('portfolio_items')
-                .select('code, quantity, price')
+                .select('code, quantity, price, currency, value') // valueを追加
                 .gte('data_date', firstDay)
                 .lte('data_date', lastDay)
                 .order('data_date', { ascending: false }),
-            supabase.from('trade_history').select('symbol, side, price, quantity').eq('user_id', FAKE_USER_ID).gte('trade_date', firstDay).lte('trade_date', lastDay)
+            supabase.from('trade_history').select('symbol, side, price, quantity, currency').eq('user_id', FAKE_USER_ID).gte('trade_date', firstDay).lte('trade_date', lastDay)
         ]);
 
         if (errorStart || errorEnd || errorTrades) {
@@ -71,10 +71,18 @@ export async function GET(request: Request) {
         const portfolioStart = getFirstOccurrenceItems(portfolioStartRaw);
         const portfolioEnd = getFirstOccurrenceItems(portfolioEndRaw);
 
+        // 月末総資産を計算
+        const totalAssetAtEnd = portfolioEnd.reduce((sum, item) => {
+            const exchangeRate = item.currency === 'USD' ? 145 : 1;
+            const itemValue = item.value || (item.price * item.quantity);
+            return sum + (itemValue * exchangeRate);
+        }, 0);
+
         console.log('[API DEBUG] Fetched and Processed Data:', {
             portfolioStartCount: portfolioStart.length,
             portfolioEndCount: portfolioEnd.length,
             tradesCount: trades?.length,
+            totalAssetAtEnd,
         });
 
         // データを扱いやすいようにMapに変換
@@ -104,27 +112,36 @@ export async function GET(request: Request) {
             
             const startPrice = startData.price;
             const name = startData.name;
+            const currency = startData.currency || 'JPY'; // 通貨を特定、デフォルトはJPY
+            const exchangeRate = currency === 'USD' ? 145 : 1;
+
             // 月末データがない場合は、月初データで代用（評価損益は0になる）
             const endPrice = endData?.price ?? startPrice;
             const endQuantity = endData?.quantity ?? 0;
 
             // 実現損益の計算
-            const realizedPl = symbolTrades
+            let realizedPl = symbolTrades
                 .filter(t => t.side === 'sell')
                 .reduce((sum, trade) => {
                     return sum + (trade.price - startPrice) * trade.quantity;
                 }, 0);
 
             // 評価損益の計算
-            const unrealizedPl = (endPrice - startPrice) * endQuantity;
+            let unrealizedPl = (endPrice - startPrice) * endQuantity;
+
+            // USDの場合は円換算
+            realizedPl *= exchangeRate;
+            unrealizedPl *= exchangeRate;
 
             const totalPl = realizedPl + unrealizedPl;
+            const plPercentage = totalAssetAtEnd > 0 ? (totalPl / totalAssetAtEnd) : 0;
 
             console.log('[API DEBUG] -> Calculated PL:', {
                 symbol,
                 realizedPl,
                 unrealizedPl,
                 totalPl,
+                plPercentage,
                 startPrice,
                 endPrice,
                 endQuantity,
@@ -138,6 +155,7 @@ export async function GET(request: Request) {
                     realizedPl,
                     unrealizedPl,
                     totalPl,
+                    plPercentage,
                 });
             } else {
                 console.log(`[API DEBUG] -> Not added to results because all PL are zero.`);
@@ -145,9 +163,15 @@ export async function GET(request: Request) {
         }
 
         console.log(`[API DEBUG] Final results count: ${results.length}`);
-        console.log('[API DEBUG] Final results:', JSON.stringify(results, null, 2));
+        
+        const responsePayload = {
+            results: results.sort((a, b) => b.totalPl - a.totalPl),
+            totalAssetAtEnd,
+        };
 
-        return NextResponse.json(results.sort((a, b) => b.totalPl - a.totalPl));
+        console.log('[API DEBUG] Final response payload:', JSON.stringify(responsePayload, null, 2));
+
+        return NextResponse.json(responsePayload);
 
     } catch (error) {
         console.error('Monthly symbol profit/loss calculation error:', error);

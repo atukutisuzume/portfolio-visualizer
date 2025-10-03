@@ -10,6 +10,7 @@ interface ProfitLossData {
   realizedPl: number;
   unrealizedPl: number;
   totalPl: number;
+  plPercentage: number;
 }
 
 interface Props {
@@ -45,6 +46,7 @@ export default function MonthlySymbolProfitLossTable({ data, isLoading }: Props)
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">実現損益</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">評価損益</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">合計損益</th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">総資産比</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -60,6 +62,9 @@ export default function MonthlySymbolProfitLossTable({ data, isLoading }: Props)
               </td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${item.totalPl >= 0 ? 'text-blue-700' : 'text-pink-700'}`}>
                 {formatCurrency(item.totalPl)}
+              </td>
+              <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${item.plPercentage >= 0 ? 'text-gray-700' : 'text-red-500'}`}>
+                {(item.plPercentage * 100).toFixed(2)}%
               </td>
             </tr>
           ))}

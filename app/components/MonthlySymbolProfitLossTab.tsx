@@ -12,6 +12,7 @@ interface ProfitLossData {
   realizedPl: number;
   unrealizedPl: number;
   totalPl: number;
+  plPercentage: number;
 }
 
 // 月の選択肢を生成する
@@ -62,7 +63,7 @@ export default function MonthlySymbolProfitLossTab() {
           throw new Error('サーバーからの応答が不正です。');
         }
         const result = await response.json();
-        setData(result);
+        setData(result.results);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'データの取得に失敗しました。');
         setData([]);
