@@ -35,20 +35,52 @@ export async function GET(request: Request) {
 
         console.log(`[API DEBUG] Calculating for month: ${month} (Base Date: ${endOfPreviousMonthStr}, End Date: ${lastDay})`);
 
-        // 1. 必要なデータを並行して取得
+        // 全銘柄のコードと名前のマップを作成
+        const { data: allItems, error: allItemsError } = await supabase
+            .from('portfolio_items')
+            .select('code, name');
+
+        if (allItemsError) {
+            console.error({ allItemsError });
+            throw new Error('全銘柄の名称リスト取得に失敗しました。');
+        }
+        const symbolNameMap = new Map<string, string>();
+        for (const item of allItems) {
+            if (!symbolNameMap.has(item.code)) {
+                symbolNameMap.set(item.code, item.name);
+            }
+        }
+
+        // 1. 前月のデータがある最終日を取得
+        const { data: lastPortfolioInPrevMonth, error: lastPortfolioError } = await supabase
+            .from('portfolios')
+            .select('data_date')
+            .lte('data_date', endOfPreviousMonthStr)
+            .order('data_date', { ascending: false })
+            .limit(1);
+
+        if (lastPortfolioError) {
+            console.error({ lastPortfolioError });
+            throw new Error('前月の最終ポートフォリオ日付の取得に失敗しました。');
+        }
+        const startDate = lastPortfolioInPrevMonth?.[0]?.data_date;
+        console.log(`[API DEBUG] Determined start date for portfolio items: ${startDate}`);
+
+        // 2. 必要なデータを並行して取得
         const [
-            { data: portfolioStartRaw, error: errorStart },
+            { data: portfolioStart, error: errorStart }, // portfolioStartRaw is now portfolioStart
             { data: portfolioEndRaw, error: errorEnd },
             { data: trades, error: errorTrades }
         ] = await Promise.all([
-            // 前月の最終日以前で最も新しいデータを取得
-            supabase.from('portfolio_items')
-                .select('code, name, quantity, price, currency, value')
-                .lte('data_date', endOfPreviousMonthStr)
-                .order('data_date', { ascending: false }),
+            // 特定した日付のポートフォリオ項目を取得
+            startDate
+                ? supabase.from('portfolio_items')
+                    .select('data_date, code, name, quantity, price, currency, value')
+                    .eq('data_date', startDate)
+                : Promise.resolve({ data: [], error: null }),
             // 月末以前で最も新しいデータを取得するため、月全体のデータを日付降順で取得
             supabase.from('portfolio_items')
-                .select('code, quantity, price, currency, value')
+                .select('code, name, quantity, price, currency, value')
                 .gte('data_date', firstDay)
                 .lte('data_date', lastDay)
                 .order('data_date', { ascending: false }),
@@ -72,7 +104,7 @@ export async function GET(request: Request) {
             return Array.from(map.values());
         };
 
-        const portfolioStart = getFirstOccurrenceItems(portfolioStartRaw);
+        // portfolioStartは特定日のデータなので、getFirstOccurrenceItemsは不要
         const portfolioEnd = getFirstOccurrenceItems(portfolioEndRaw);
 
         // 月末総資産を計算
@@ -110,13 +142,13 @@ export async function GET(request: Request) {
             const symbolTrades = trades?.filter(t => t.symbol === symbol) || [];
 
             let effectiveStartPrice = 0;
-            let effectiveName = symbol;
+            let effectiveName = symbolNameMap.get(symbol) || symbol; // デフォルト名をマップから取得
             let effectiveCurrency = 'JPY';
 
             if (startData) {
                 // ケース1: 前月末に保有していた銘柄
                 effectiveStartPrice = startData.price;
-                effectiveName = startData.name;
+                effectiveName = startData.name; // startDataに名前があれば上書き
                 effectiveCurrency = startData.currency || 'JPY';
             } else {
                 // ケース2: 前月末に保有していなかった銘柄 (その月に新規購入)
@@ -132,7 +164,7 @@ export async function GET(request: Request) {
                     console.log(`[API DEBUG] -> Skipped: No start data and no buy trades in month for symbol ${symbol}.`);
                     continue;
                 }
-                effectiveName = symbol;
+                // effectiveNameは既にマップから取得済み
             }
 
             const exchangeRate = effectiveCurrency === 'USD' ? USD_TO_JPY_RATE : 1;
@@ -191,8 +223,6 @@ export async function GET(request: Request) {
             results: results.sort((a, b) => b.totalPl - a.totalPl),
             totalAssetAtEnd,
         };
-
-        console.log('[API DEBUG] Final response payload:', JSON.stringify(responsePayload, null, 2));
 
         return NextResponse.json(responsePayload);
 
