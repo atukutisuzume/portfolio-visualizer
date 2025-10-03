@@ -176,8 +176,8 @@ export default function MonthlySymbolProfitLossTab() {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
+        <div className="grid grid-cols-2 gap-6">
+            <div className="min-w-0">
                 <MonthlySymbolProfitLossTable 
                     data={data} 
                     isLoading={isLoading} 
@@ -186,7 +186,7 @@ export default function MonthlySymbolProfitLossTab() {
                     selectedSymbol={selectedSymbol}
                 />
             </div>
-            <div className="h-full">
+            <div className="h-full min-w-0">
                 {isHistoryLoading ? (
                     <div className="flex justify-center items-center h-full bg-white rounded-lg shadow"><p>グラフを読み込み中...</p></div>
                 ) : selectedSymbol && historyData.length > 0 ? (
