@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import MonthlySymbolProfitLossTable from './MonthlySymbolProfitLossTable';
+import SymbolHistoryChart from './SymbolHistoryChart';
 import { fetchAvailableDates } from '@/lib/api';
 
 interface ProfitLossData {
@@ -13,6 +14,12 @@ interface ProfitLossData {
   unrealizedPl: number;
   totalPl: number;
   plPercentage: number;
+}
+
+interface HistoryData {
+    date: string;
+    quantity: number;
+    holdingRate: number;
 }
 
 // 月の選択肢を生成する
@@ -32,6 +39,10 @@ export default function MonthlySymbolProfitLossTab() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [monthOptions, setMonthOptions] = useState<string[]>([]);
   const [isAmountVisible, setIsAmountVisible] = useState(true);
+
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<HistoryData[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -54,6 +65,8 @@ export default function MonthlySymbolProfitLossTab() {
         setIsLoading(false);
         return;
     }
+    setSelectedSymbol(null); // 月が変わったら銘柄選択をリセット
+    setHistoryData([]);
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -75,6 +88,29 @@ export default function MonthlySymbolProfitLossTab() {
 
     fetchData();
   }, [selectedMonth]);
+
+  useEffect(() => {
+    if (!selectedSymbol || !selectedMonth) return;
+
+    const fetchHistoryData = async () => {
+        setIsHistoryLoading(true);
+        try {
+            const response = await fetch(`/api/portfolio/symbol-history?month=${selectedMonth}&symbol=${selectedSymbol}`);
+            if (!response.ok) {
+                throw new Error('銘柄の履歴データの取得に失敗しました。');
+            }
+            const data = await response.json();
+            setHistoryData(data);
+        } catch (error) {
+            console.error(error);
+            setHistoryData([]);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    fetchHistoryData();
+  }, [selectedSymbol, selectedMonth]);
 
   const { positiveContribution, negativeContribution } = useMemo(() => {
     if (!data) return { positiveContribution: 0, negativeContribution: 0 };
@@ -140,7 +176,28 @@ export default function MonthlySymbolProfitLossTab() {
             </div>
         </div>
 
-        <MonthlySymbolProfitLossTable data={data} isLoading={isLoading} isAmountVisible={isAmountVisible} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <MonthlySymbolProfitLossTable 
+                    data={data} 
+                    isLoading={isLoading} 
+                    isAmountVisible={isAmountVisible} 
+                    onRowClick={(symbol) => setSelectedSymbol(symbol)}
+                    selectedSymbol={selectedSymbol}
+                />
+            </div>
+            <div className="h-full">
+                {isHistoryLoading ? (
+                    <div className="flex justify-center items-center h-full bg-white rounded-lg shadow"><p>グラフを読み込み中...</p></div>
+                ) : selectedSymbol && historyData.length > 0 ? (
+                    <SymbolHistoryChart data={historyData} symbol={selectedSymbol} />
+                ) : (
+                    <div className="flex justify-center items-center h-full bg-white rounded-lg shadow">
+                        <p className="text-gray-500">銘柄を選択すると、ここに推移グラフが表示されます。</p>
+                    </div>
+                )}
+            </div>
+        </div>
     </div>
   );
 }

@@ -17,6 +17,8 @@ interface Props {
   data: ProfitLossData[];
   isLoading: boolean;
   isAmountVisible: boolean;
+  onRowClick: (symbol: string) => void;
+  selectedSymbol: string | null;
 }
 
 const formatCurrency = (value: number) => {
@@ -30,7 +32,7 @@ const formatCurrency = (value: number) => {
 
 const MASK = '********';
 
-export default function MonthlySymbolProfitLossTable({ data, isLoading, isAmountVisible }: Props) {
+export default function MonthlySymbolProfitLossTable({ data, isLoading, isAmountVisible, onRowClick, selectedSymbol }: Props) {
   if (isLoading) {
     return <div className="text-center p-8">読み込み中...</div>;
   }
@@ -54,7 +56,10 @@ export default function MonthlySymbolProfitLossTable({ data, isLoading, isAmount
         </thead>
         <tbody className="divide-y divide-gray-200">
           {data.map((item) => (
-            <tr key={item.symbol} className="hover:bg-gray-50">
+            <tr 
+              key={item.symbol} 
+              onClick={() => onRowClick(item.symbol)}
+              className={`cursor-pointer ${selectedSymbol === item.symbol ? 'bg-indigo-100' : 'hover:bg-gray-50'}`}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.symbol}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.name}</td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${item.realizedPl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
