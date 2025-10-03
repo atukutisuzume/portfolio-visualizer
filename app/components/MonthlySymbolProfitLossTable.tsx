@@ -16,6 +16,7 @@ interface ProfitLossData {
 interface Props {
   data: ProfitLossData[];
   isLoading: boolean;
+  isAmountVisible: boolean;
 }
 
 const formatCurrency = (value: number) => {
@@ -27,7 +28,9 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-export default function MonthlySymbolProfitLossTable({ data, isLoading }: Props) {
+const MASK = '********';
+
+export default function MonthlySymbolProfitLossTable({ data, isLoading, isAmountVisible }: Props) {
   if (isLoading) {
     return <div className="text-center p-8">読み込み中...</div>;
   }
@@ -55,13 +58,13 @@ export default function MonthlySymbolProfitLossTable({ data, isLoading }: Props)
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.symbol}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.name}</td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${item.realizedPl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(item.realizedPl)}
+                {isAmountVisible ? formatCurrency(item.realizedPl) : MASK}
               </td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${item.unrealizedPl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(item.unrealizedPl)}
+                {isAmountVisible ? formatCurrency(item.unrealizedPl) : MASK}
               </td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${item.totalPl >= 0 ? 'text-blue-700' : 'text-pink-700'}`}>
-                {formatCurrency(item.totalPl)}
+                {isAmountVisible ? formatCurrency(item.totalPl) : MASK}
               </td>
               <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${item.plPercentage >= 0 ? 'text-gray-700' : 'text-red-500'}`}>
                 {(item.plPercentage * 100).toFixed(2)}%

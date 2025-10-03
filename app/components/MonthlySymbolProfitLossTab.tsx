@@ -31,6 +31,7 @@ export default function MonthlySymbolProfitLossTab() {
   const [error, setError] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [monthOptions, setMonthOptions] = useState<string[]>([]);
+  const [isAmountVisible, setIsAmountVisible] = useState(true);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -77,23 +78,37 @@ export default function MonthlySymbolProfitLossTab() {
 
   return (
     <div className="p-4 md:p-6">
-        <div className="flex items-center space-x-4 mb-6">
-            <label htmlFor="month-select" className="font-semibold text-gray-700">対象月:</label>
-            <select 
-                id="month-select"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
-            >
-                {monthOptions.map(month => (
-                    <option key={month} value={month}>{month}</option>
-                ))}
-            </select>
+        <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center space-x-4">
+                <label htmlFor="month-select" className="font-semibold text-gray-700">対象月:</label>
+                <select 
+                    id="month-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
+                >
+                    {monthOptions.map(month => (
+                        <option key={month} value={month}>{month}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="flex items-center">
+                <input
+                    id="amount-visibility"
+                    type="checkbox"
+                    checked={isAmountVisible}
+                    onChange={(e) => setIsAmountVisible(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="amount-visibility" className="ml-2 block text-sm text-gray-900">
+                    金額を表示
+                </label>
+            </div>
         </div>
 
         {error && <div className="text-red-500 bg-red-100 p-4 rounded-md">エラー: {error}</div>}
 
-        <MonthlySymbolProfitLossTable data={data} isLoading={isLoading} />
+        <MonthlySymbolProfitLossTable data={data} isLoading={isLoading} isAmountVisible={isAmountVisible} />
     </div>
   );
 }
