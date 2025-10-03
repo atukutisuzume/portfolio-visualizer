@@ -32,7 +32,7 @@ export async function GET(request: Request) {
             { data: portfolioHistoryRaw, error: portfolioError } // 変数名を変更
         ] = await Promise.all([
             supabase.from('portfolio_items')
-                .select('data_date, quantity, value')
+                .select('data_date, quantity, value, currency') // currencyを追加
                 .eq('code', symbol)
                 .gte('data_date', firstDay)
                 .lte('data_date', lastDay),
@@ -82,8 +82,11 @@ export async function GET(request: Request) {
 
             if (item && totalAsset > 0) {
                 // 銘柄データも総資産データもある日
+                const exchangeRate = item.currency === 'USD' ? 145 : 1; // 換算レートを取得
+                const itemValueInJPY = item.value * exchangeRate; // JPYに換算
+
                 const calculatedQuantity = item.quantity;
-                const calculatedHoldingRate = item.value / totalAsset;
+                const calculatedHoldingRate = itemValueInJPY / totalAsset; // 換算後の値で計算
                 console.log(`[API DEBUG] -> Calculated: quantity=${calculatedQuantity}, holdingRate=${calculatedHoldingRate}`);
                 return {
                     date: dateString,
