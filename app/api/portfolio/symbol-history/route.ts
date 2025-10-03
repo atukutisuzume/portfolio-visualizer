@@ -2,6 +2,7 @@
 // app/api/portfolio/symbol-history/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { USD_TO_JPY_RATE } from '@/lib/constants';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
 
             if (item && totalAsset > 0) {
                 // 銘柄データも総資産データもある日
-                const exchangeRate = item.currency === 'USD' ? 145 : 1; // 換算レートを取得
+                const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1; // 換算レートを取得
                 const itemValueInJPY = item.value * exchangeRate; // JPYに換算
 
                 const calculatedQuantity = item.quantity;

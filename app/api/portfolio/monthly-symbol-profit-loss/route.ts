@@ -2,6 +2,7 @@
 // app/api/portfolio/monthly-symbol-profit-loss/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { USD_TO_JPY_RATE } from '@/lib/constants';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 // 定数として定義されているユーザーIDを使用
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
 
         // 月末総資産を計算
         const totalAssetAtEnd = portfolioEnd.reduce((sum, item) => {
-            const exchangeRate = item.currency === 'USD' ? 145 : 1;
+            const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1;
             const itemValue = item.value || (item.price * item.quantity);
             return sum + (itemValue * exchangeRate);
         }, 0);
@@ -116,7 +117,7 @@ export async function GET(request: Request) {
             const startPrice = startData.price;
             const name = startData.name;
             const currency = startData.currency || 'JPY'; // 通貨を特定、デフォルトはJPY
-            const exchangeRate = currency === 'USD' ? 145 : 1;
+            const exchangeRate = currency === 'USD' ? USD_TO_JPY_RATE : 1;
 
             // 月末データがない場合は、月初データで代用（評価損益は0になる）
             const endPrice = endData?.price ?? startPrice;

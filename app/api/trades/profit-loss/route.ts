@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { calculateProfitLoss, Trade, ProfitLossRecord, ProfitLossSummary } from '@/lib/profitLossCalculator';
+import { USD_TO_JPY_RATE } from '@/lib/constants';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 const FAKE_USER_ID = '123e4567-e89b-12d3-a456-426614174000';
@@ -157,7 +158,7 @@ export async function GET(request: Request) {
         
         let profitLoss = record.profitLoss;
         if (record.currency === 'USD') {
-          profitLoss *= 145; // USDをJPYに換算
+          profitLoss *= USD_TO_JPY_RATE; // USDをJPYに換算
         }
         acc[month] += profitLoss;
 
