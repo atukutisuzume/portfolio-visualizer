@@ -109,29 +109,48 @@ export async function GET(request: Request) {
             const endData = portfolioEndMap.get(symbol);
             const symbolTrades = trades?.filter(t => t.symbol === symbol) || [];
 
-            if (!startData) {
-                console.log(`[API DEBUG] -> Skipped: No start data for symbol ${symbol}.`);
-                continue;
+            let effectiveStartPrice = 0;
+            let effectiveName = symbol;
+            let effectiveCurrency = 'JPY';
+
+            if (startData) {
+                // ケース1: 前月末に保有していた銘柄
+                effectiveStartPrice = startData.price;
+                effectiveName = startData.name;
+                effectiveCurrency = startData.currency || 'JPY';
+            } else {
+                // ケース2: 前月末に保有していなかった銘柄 (その月に新規購入)
+                // その月の購入取引の平均価格を基準とする
+                const buyTradesInMonth = symbolTrades.filter(t => t.side === 'buy');
+                if (buyTradesInMonth.length > 0) {
+                    const totalBuyValue = buyTradesInMonth.reduce((sum, t) => sum + t.price * t.quantity, 0);
+                    const totalBuyQuantity = buyTradesInMonth.reduce((sum, t) => sum + t.quantity, 0);
+                    effectiveStartPrice = totalBuyValue / totalBuyQuantity;
+                    effectiveCurrency = buyTradesInMonth[0].currency || 'JPY';
+                } else {
+                    // その月に購入取引もなければ、損益計算は行わない
+                    console.log(`[API DEBUG] -> Skipped: No start data and no buy trades in month for symbol ${symbol}.`);
+                    continue;
+                }
+                effectiveName = symbol;
             }
-            
-            const startPrice = startData.price;
-            const name = startData.name;
-            const currency = startData.currency || 'JPY'; // 通貨を特定、デフォルトはJPY
-            const exchangeRate = currency === 'USD' ? USD_TO_JPY_RATE : 1;
+
+            const exchangeRate = effectiveCurrency === 'USD' ? USD_TO_JPY_RATE : 1;
 
             // 月末データがない場合は、月初データで代用（評価損益は0になる）
-            const endPrice = endData?.price ?? startPrice;
+            const endPrice = endData?.price ?? effectiveStartPrice;
             const endQuantity = endData?.quantity ?? 0;
 
             // 実現損益の計算
             let realizedPl = symbolTrades
                 .filter(t => t.side === 'sell')
                 .reduce((sum, trade) => {
-                    return sum + (trade.price - startPrice) * trade.quantity;
+                    // 売却価格 - 基準価格 (月初時価 or その月の平均購入価格)
+                    return sum + (trade.price - effectiveStartPrice) * trade.quantity;
                 }, 0);
 
             // 評価損益の計算
-            let unrealizedPl = (endPrice - startPrice) * endQuantity;
+            let unrealizedPl = (endPrice - effectiveStartPrice) * endQuantity;
 
             // USDの場合は円換算
             realizedPl *= exchangeRate;
@@ -146,7 +165,7 @@ export async function GET(request: Request) {
                 unrealizedPl,
                 totalPl,
                 plPercentage,
-                startPrice,
+                effectiveStartPrice,
                 endPrice,
                 endQuantity,
                 tradeCount: symbolTrades.length,
@@ -155,7 +174,7 @@ export async function GET(request: Request) {
             if (totalPl !== 0 || realizedPl !== 0 || unrealizedPl !== 0) {
                  results.push({
                     symbol,
-                    name,
+                    name: effectiveName,
                     realizedPl,
                     unrealizedPl,
                     totalPl,
