@@ -7,6 +7,7 @@ import TableTab from "@/components/TableTab";
 import ProfitLossTab from "@/components/ProfitLossTab";
 import ProfitLossCalendarTab from "@/components/ProfitLossCalendarTab";
 import CompositionHistoryTab from "@/components/CompositionHistoryTab"; // 追加
+import MonthlySymbolProfitLossTab from '@/components/MonthlySymbolProfitLossTab';
 
 const tabs = [
   { id: 'upload', label: 'アップロード' },
@@ -15,6 +16,7 @@ const tabs = [
   { id: 'profit-loss', label: '損益レポート' },
   { id: 'profit-loss-calendar', label: '損益カレンダー' },
   { id: 'composition-history', label: '保有率遷移' }, // 追加
+  { id: 'monthly-pl', label: '月次銘柄損益' },
 ];
 
 export default function Home() {
@@ -40,6 +42,7 @@ export default function Home() {
         {activeTab === 'profit-loss' && <ProfitLossTab />}
         {activeTab === 'profit-loss-calendar' && <ProfitLossCalendarTab />}
         {activeTab === 'composition-history' && <CompositionHistoryTab />} {/* 追加 */}
+        {activeTab === 'monthly-pl' && <MonthlySymbolProfitLossTab />}
       </div>
     </main>
   );

@@ -1,0 +1,98 @@
+
+// app/components/MonthlySymbolProfitLossTab.tsx
+"use client";
+
+import React, { useState, useEffect, useMemo } from 'react';
+import MonthlySymbolProfitLossTable from './MonthlySymbolProfitLossTable';
+import { fetchAvailableDates } from '@/lib/api';
+
+interface ProfitLossData {
+  symbol: string;
+  name: string;
+  realizedPl: number;
+  unrealizedPl: number;
+  totalPl: number;
+}
+
+// 月の選択肢を生成する
+const generateMonthOptions = (dates: string[]): string[] => {
+    if (!dates || dates.length === 0) return [];
+    const monthSet = new Set<string>();
+    dates.forEach(date => {
+        monthSet.add(date.substring(0, 7)); // YYYY-MM
+    });
+    return Array.from(monthSet).sort().reverse();
+};
+
+export default function MonthlySymbolProfitLossTab() {
+  const [data, setData] = useState<ProfitLossData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [monthOptions, setMonthOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const availableDates = await fetchAvailableDates();
+        const options = generateMonthOptions(availableDates);
+        setMonthOptions(options);
+        if (options.length > 0) {
+          setSelectedMonth(options[0]);
+        }
+      } catch (e) {
+        setError('データの取得可能日の読み込みに失敗しました。');
+      }
+    };
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedMonth) {
+        setIsLoading(false);
+        return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/portfolio/monthly-symbol-profit-loss?month=${selectedMonth}`);
+        if (!response.ok) {
+          throw new Error('サーバーからの応答が不正です。');
+        }
+        const result = await response.json();
+        setData(result);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'データの取得に失敗しました。');
+        setData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedMonth]);
+
+  return (
+    <div className="p-4 md:p-6">
+        <div className="flex items-center space-x-4 mb-6">
+            <label htmlFor="month-select" className="font-semibold text-gray-700">対象月:</label>
+            <select 
+                id="month-select"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm"
+            >
+                {monthOptions.map(month => (
+                    <option key={month} value={month}>{month}</option>
+                ))}
+            </select>
+        </div>
+
+        {error && <div className="text-red-500 bg-red-100 p-4 rounded-md">エラー: {error}</div>}
+
+        <MonthlySymbolProfitLossTable data={data} isLoading={isLoading} />
+    </div>
+  );
+}
