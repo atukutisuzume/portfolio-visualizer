@@ -9,7 +9,7 @@ import { extractDateFromFilename } from "@/lib/extractDateFromFilename";
 export function usePortfolioUpload() {
   const [currentPortfolioItems, setCurrentPortfolioItems] = useState<PortfolioItem[]>([]);
   
-  const [selectedDate, setSelectedDate] = useState<string>(''); // 初期値を削除
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [brokerName, setBrokerName] = useState<string>('');
   const [totalAsset, setTotalAsset] = useState<number | ''>('');
 
@@ -20,7 +20,7 @@ export function usePortfolioUpload() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isBusy = isLoading || isSaving;
-  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0;
+  const isSaveDisabled = isBusy || !selectedDate || !brokerName || totalAsset === '';
 
   const handleFile = async (file: File) => {
     setIsLoading(true);
@@ -44,8 +44,8 @@ export function usePortfolioUpload() {
   };
 
   const handleSave = async () => {
-    if (!selectedDate || !brokerName || totalAsset === '' || currentPortfolioItems.length === 0) {
-      setError('日付、証券会社名、総資産額、またはデータが不足しています。');
+    if (!selectedDate || !brokerName || totalAsset === '') {
+      setError('日付、証券会社名、総資産額を入力してください。');
       return;
     }
 
@@ -57,7 +57,7 @@ export function usePortfolioUpload() {
       const portfolio = {
         broker: brokerName,
         total_asset: Number(totalAsset),
-        data_date: selectedDate, // created_at を data_date に変更
+        data_date: selectedDate,
       };
 
       await savePortfolioWithItems(portfolio, currentPortfolioItems);
@@ -67,7 +67,7 @@ export function usePortfolioUpload() {
       setCurrentPortfolioItems([]);
       setBrokerName('');
       setTotalAsset('');
-      setSelectedDate(''); // 初期値を削除
+      setSelectedDate('');
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存エラー');
     } finally {

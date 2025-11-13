@@ -23,6 +23,7 @@ export default function PortfolioInputs({
   return (
     <section className="bg-white border-l-4 border-purple-400 p-6 rounded-lg shadow">
       <h2 className="text-xl font-bold text-purple-700 mb-4">データ入力・保存</h2>
+      <p className="text-sm text-gray-600 mb-4">CSVファイルがない場合、こちらから日付、証券会社名、総資産額を手動で登録できます。</p>
       <div className="flex flex-col sm:flex-row gap-4">
         <input
           type="date"
