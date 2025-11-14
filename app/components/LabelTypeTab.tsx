@@ -4,37 +4,45 @@ import { useLabelType } from "@/hooks/useLabelType";
 import LabelTypeInput from "./LabelTypeInput";
 import { useLabel } from "@/hooks/useLabel";
 import LabelInput from "./LabelInput";
+import { useStock } from "@/hooks/useStock";
+import StockInput from "./StockInput";
 
 export default function LabelTypeTab() {
-  // Hook for creating Label Types
   const labelType = useLabelType();
-
-  // Hook for creating Labels
   const label = useLabel();
+  const stock = useStock();
+
+  const successMessage = labelType.successMessage || label.successMessage || stock.successMessage;
+  const errorMessage = labelType.error || label.error || stock.error;
 
   return (
     <div className="space-y-8">
-      {/* Success/Error Messages */}
-      {labelType.successMessage && (
+      {successMessage && (
         <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded shadow">
-          <p className="text-green-700">{labelType.successMessage}</p>
+          <p className="text-green-700">{successMessage}</p>
         </div>
       )}
-      {label.successMessage && (
-        <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded shadow">
-          <p className="text-green-700">{label.successMessage}</p>
-        </div>
-      )}
-      {labelType.error && (
+      {errorMessage && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded shadow">
-          <p className="text-red-700">{labelType.error}</p>
+          <p className="text-red-700">{errorMessage}</p>
         </div>
       )}
-      {label.error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded shadow">
-          <p className="text-red-700">{label.error}</p>
-        </div>
-      )}
+
+      {/* Form for creating Stocks */}
+      <section className="bg-white border-l-4 border-sky-400 p-6 rounded-lg shadow">
+        <h2 className="text-xl font-bold text-sky-700 mb-4">新しい銘柄の登録</h2>
+        <StockInput
+          symbol={stock.symbol}
+          setSymbol={stock.setSymbol}
+          name={stock.name}
+          setName={stock.setName}
+          currency={stock.currency}
+          setCurrency={stock.setCurrency}
+          handleSave={stock.handleSave}
+          isSaving={stock.isSaving}
+          isSaveDisabled={stock.isSaveDisabled}
+        />
+      </section>
 
       {/* Form for creating Label Types */}
       <section className="bg-white border-l-4 border-indigo-400 p-6 rounded-lg shadow">
