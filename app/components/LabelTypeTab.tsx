@@ -6,14 +6,17 @@ import { useLabel } from "@/hooks/useLabel";
 import LabelInput from "./LabelInput";
 import { useStock } from "@/hooks/useStock";
 import StockInput from "./StockInput";
+import { useStockLabel } from "@/hooks/useStockLabel";
+import StockLabelInput from "./StockLabelInput";
 
 export default function LabelTypeTab() {
   const labelType = useLabelType();
   const label = useLabel();
   const stock = useStock();
+  const stockLabel = useStockLabel();
 
-  const successMessage = labelType.successMessage || label.successMessage || stock.successMessage;
-  const errorMessage = labelType.error || label.error || stock.error;
+  const successMessage = labelType.successMessage || label.successMessage || stock.successMessage || stockLabel.successMessage;
+  const errorMessage = labelType.error || label.error || stock.error || stockLabel.error;
 
   return (
     <div className="space-y-8">
@@ -27,6 +30,23 @@ export default function LabelTypeTab() {
           <p className="text-red-700">{errorMessage}</p>
         </div>
       )}
+
+      {/* Form for associating Stocks with Labels */}
+      <section className="bg-white border-l-4 border-pink-400 p-6 rounded-lg shadow">
+        <h2 className="text-xl font-bold text-pink-700 mb-4">銘柄とラベルの関連付け</h2>
+        <StockLabelInput
+          selectedStockId={stockLabel.selectedStockId}
+          setSelectedStockId={stockLabel.setSelectedStockId}
+          selectedLabelId={stockLabel.selectedLabelId}
+          setSelectedLabelId={stockLabel.setSelectedLabelId}
+          stocks={stockLabel.stocks}
+          labels={stockLabel.labels}
+          handleSave={stockLabel.handleSave}
+          isLoading={stockLabel.isLoading}
+          isSaving={stockLabel.isSaving}
+          isSaveDisabled={stockLabel.isSaveDisabled}
+        />
+      </section>
 
       {/* Form for creating Stocks */}
       <section className="bg-white border-l-4 border-sky-400 p-6 rounded-lg shadow">

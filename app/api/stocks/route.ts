@@ -3,6 +3,27 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('stocks')
+      .select('id, symbol, name')
+      .order('symbol', { ascending: true });
+
+    if (error) {
+      throw new Error(error.message || "Failed to fetch stocks.");
+    }
+
+    return NextResponse.json(data, { status: 200 });
+  } catch (err: any) {
+    console.error("API error (GET stocks):", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to fetch stocks." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const { symbol, name, currency } = await request.json();
 

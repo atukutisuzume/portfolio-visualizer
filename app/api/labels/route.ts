@@ -3,6 +3,27 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('labels')
+      .select('id, name')
+      .order('name', { ascending: true });
+
+    if (error) {
+      throw new Error(error.message || "Failed to fetch labels.");
+    }
+
+    return NextResponse.json(data, { status: 200 });
+  } catch (err: any) {
+    console.error("API error (GET labels):", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to fetch labels." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const { name, type_id } = await request.json();
 

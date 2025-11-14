@@ -12,7 +12,7 @@ import LabelTypeTab from "@/components/LabelTypeTab";
 
 const tabs = [
   { id: 'upload', label: 'アップロード' },
-  { id: 'label', label: 'ラベルタイプ登録' },
+  { id: 'label', label: '各種マスタ登録' },
   { id: 'portfolio', label: 'ポートフォリオ' },
   { id: 'table', label: '上昇率' },
   { id: 'profit-loss', label: '損益レポート' },
