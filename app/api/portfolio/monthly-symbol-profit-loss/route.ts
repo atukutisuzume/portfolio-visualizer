@@ -57,34 +57,49 @@ export async function GET(request: Request) {
             .select('data_date')
             .lte('data_date', endOfPreviousMonthStr)
             .order('data_date', { ascending: false })
-            .limit(1);
+            .limit(1)
+            .single();
 
-        if (lastPortfolioError) {
+        if (lastPortfolioError && lastPortfolioError.code !== 'PGRST116') { // 'PGRST116' (query returned no rows) is not an error here
             console.error({ lastPortfolioError });
             throw new Error('前月の最終ポートフォリオ日付の取得に失敗しました。');
         }
-        const startDate = lastPortfolioInPrevMonth?.[0]?.data_date;
+        const startDate = lastPortfolioInPrevMonth?.data_date;
         console.log(`[API DEBUG] Determined start date for portfolio items: ${startDate}`);
+
+        // 当月のデータがある最終日を取得
+        const { data: lastPortfolioInCurrentMonth, error: currentPortfolioError } = await supabase
+            .from('portfolios')
+            .select('data_date')
+            .gte('data_date', firstDay)
+            .lte('data_date', lastDay)
+            .order('data_date', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (currentPortfolioError && currentPortfolioError.code !== 'PGRST116') {
+            console.error({ currentPortfolioError });
+            throw new Error('当月の最終ポートフォリオ日付の取得に失敗しました。');
+        }
+        const endDate = lastPortfolioInCurrentMonth?.data_date;
+        console.log(`[API DEBUG] Determined end date for portfolio items: ${endDate}`);
 
         // 2. 必要なデータを並行して取得
         const [
-            { data: portfolioStart, error: errorStart }, // portfolioStartRaw is now portfolioStart
-            { data: portfolioEndRaw, error: errorEnd },
+            { data: portfolioStart, error: errorStart },
+            { data: portfolioEnd, error: errorEnd },
             { data: trades, error: errorTrades }
         ] = await Promise.all([
-            // 特定した日付のポートフォリオ項目を取得
+            // 月初ポートフォリオ項目を取得
             startDate
-                ? supabase.from('portfolio_items')
-                    .select('data_date, code, name, quantity, price, currency, value')
-                    .eq('data_date', startDate)
+                ? supabase.from('portfolio_items').select('data_date, code, name, quantity, price, currency, value').eq('data_date', startDate)
                 : Promise.resolve({ data: [], error: null }),
-            // 月末以前で最も新しいデータを取得するため、月全体のデータを日付降順で取得
-            supabase.from('portfolio_items')
-                .select('code, name, quantity, price, currency, value')
-                .gte('data_date', firstDay)
-                .lte('data_date', lastDay)
-                .order('data_date', { ascending: false }),
-            supabase.from('trade_history').select('symbol, side, price, quantity, currency').eq('user_id', FAKE_USER_ID).gte('trade_date', firstDay).lte('trade_date', lastDay)
+            // 月末ポートフォリオ項目を取得
+            endDate
+                ? supabase.from('portfolio_items').select('data_date, code, name, quantity, price, currency, value').eq('data_date', endDate)
+                : Promise.resolve({ data: [], error: null }),
+            // 月内の取引履歴を取得
+            supabase.from('trade_history').select('symbol, side, price, quantity, currency, trade_date').eq('user_id', FAKE_USER_ID).gte('trade_date', firstDay).lte('trade_date', lastDay)
         ]);
 
         if (errorStart || errorEnd || errorTrades) {
@@ -92,42 +107,28 @@ export async function GET(request: Request) {
             throw new Error('DBからのデータ取得に失敗しました。');
         }
 
-        // 銘柄ごとに最初に出現するレコードのみを保持するヘルパー (日付でソート済みが前提)
-        const getFirstOccurrenceItems = (items: any[] | null) => {
-            if (!items) return [];
-            const map = new Map();
-            for (const item of items) {
-                if (!map.has(item.code)) {
-                    map.set(item.code, item);
-                }
-            }
-            return Array.from(map.values());
-        };
-
-        // portfolioStartは特定日のデータなので、getFirstOccurrenceItemsは不要
-        const portfolioEnd = getFirstOccurrenceItems(portfolioEndRaw);
-
         // 月末総資産を計算
-        const totalAssetAtEnd = portfolioEnd.reduce((sum, item) => {
+        const totalAssetAtEnd = (portfolioEnd || []).reduce((sum, item) => {
             const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1;
             const itemValue = item.value || (item.price * item.quantity);
             return sum + (itemValue * exchangeRate);
         }, 0);
 
         console.log('[API DEBUG] Fetched and Processed Data:', {
-            portfolioStartCount: portfolioStart.length,
-            portfolioEndCount: portfolioEnd.length,
-            tradesCount: trades?.length,
+            portfolioStartCount: portfolioStart?.length || 0,
+            portfolioEndCount: portfolioEnd?.length || 0,
+            tradesCount: trades?.length || 0,
             totalAssetAtEnd,
         });
 
         // データを扱いやすいようにMapに変換
-        const portfolioStartMap = new Map(portfolioStart.map(item => [item.code, item]));
-        const portfolioEndMap = new Map(portfolioEnd.map(item => [item.code, item]));
+        const portfolioStartMap = new Map((portfolioStart || []).map(item => [item.code, item]));
+        const portfolioEndMap = new Map((portfolioEnd || []).map(item => [item.code, item]));
 
         // 2. 関連するすべての銘柄コードを取得
         const allSymbols = new Set([
-            ...portfolioStart.map(p => p.code),
+            ...(portfolioStart?.map(p => p.code) || []),
+            ...(portfolioEnd?.map(p => p.code) || []),
             ...(trades?.map(t => t.symbol) || [])
         ]);
 
@@ -136,84 +137,51 @@ export async function GET(request: Request) {
         // 3. 銘柄ごとに損益を計算
         const results = [];
         for (const symbol of allSymbols) {
-            console.log(`[API DEBUG] Processing symbol: ${symbol}`);
             const startData = portfolioStartMap.get(symbol);
             const endData = portfolioEndMap.get(symbol);
             const symbolTrades = trades?.filter(t => t.symbol === symbol) || [];
 
-            let effectiveStartPrice = 0;
-            let effectiveName = symbolNameMap.get(symbol) || symbol; // デフォルト名をマップから取得
-            let effectiveCurrency = 'JPY';
+            const currency = startData?.currency || endData?.currency || symbolTrades[0]?.currency || 'JPY';
+            const exchangeRate = currency === 'USD' ? USD_TO_JPY_RATE : 1;
 
-            if (startData) {
-                // ケース1: 前月末に保有していた銘柄
-                effectiveStartPrice = startData.price;
-                effectiveName = startData.name; // startDataに名前があれば上書き
-                effectiveCurrency = startData.currency || 'JPY';
-            } else {
-                // ケース2: 前月末に保有していなかった銘柄 (その月に新規購入)
-                // その月の購入取引の平均価格を基準とする
-                const buyTradesInMonth = symbolTrades.filter(t => t.side === 'buy');
-                if (buyTradesInMonth.length > 0) {
-                    const totalBuyValue = buyTradesInMonth.reduce((sum, t) => sum + t.price * t.quantity, 0);
-                    const totalBuyQuantity = buyTradesInMonth.reduce((sum, t) => sum + t.quantity, 0);
-                    effectiveStartPrice = totalBuyValue / totalBuyQuantity;
-                    effectiveCurrency = buyTradesInMonth[0].currency || 'JPY';
-                } else {
-                    // その月に購入取引もなければ、損益計算は行わない
-                    console.log(`[API DEBUG] -> Skipped: No start data and no buy trades in month for symbol ${symbol}.`);
-                    continue;
-                }
-                // effectiveNameは既にマップから取得済み
-            }
+            // 月初の評価額
+            const startValue = (startData?.value || (startData?.price * startData?.quantity) || 0);
 
-            const exchangeRate = effectiveCurrency === 'USD' ? USD_TO_JPY_RATE : 1;
+            // 月末の評価額
+            const endValue = (endData?.value || (endData?.price * endData?.quantity) || 0);
 
-            // 月末データがない場合は、月初データで代用（評価損益は0になる）
-            const endPrice = endData?.price ?? effectiveStartPrice;
-            const endQuantity = endData?.quantity ?? 0;
+            // 月内の売買金額
+            const boughtAmount = symbolTrades
+                .filter(t => t.side === 'buy')
+                .reduce((sum, t) => sum + t.price * t.quantity, 0);
 
-            // 実現損益の計算
-            let realizedPl = symbolTrades
+            const soldAmount = symbolTrades
                 .filter(t => t.side === 'sell')
-                .reduce((sum, trade) => {
-                    // 売却価格 - 基準価格 (月初時価 or その月の平均購入価格)
-                    return sum + (trade.price - effectiveStartPrice) * trade.quantity;
-                }, 0);
+                .reduce((sum, t) => sum + t.price * t.quantity, 0);
 
-            // 評価損益の計算
-            let unrealizedPl = (endPrice - effectiveStartPrice) * endQuantity;
+            // 新しい計算ロジックを適用
+            const totalPl = (endValue + soldAmount) - (startValue + boughtAmount);
+            
+            // 損益の内訳を計算
+            const realizedPl = soldAmount - boughtAmount; // 売買によるキャッシュフロー
+            const unrealizedPl = endValue - startValue; // 保有資産の評価額変動
 
-            // USDの場合は円換算
-            realizedPl *= exchangeRate;
-            unrealizedPl *= exchangeRate;
+            // 円換算
+            const totalPlJpy = totalPl * exchangeRate;
+            const realizedPlJpy = realizedPl * exchangeRate;
+            const unrealizedPlJpy = unrealizedPl * exchangeRate;
 
-            const totalPl = realizedPl + unrealizedPl;
-            const plPercentage = totalAssetAtEnd > 0 ? (totalPl / totalAssetAtEnd) : 0;
+            const plPercentage = totalAssetAtEnd > 0 ? (totalPlJpy / totalAssetAtEnd) : 0;
 
-            console.log('[API DEBUG] -> Calculated PL:', {
-                symbol,
-                realizedPl,
-                unrealizedPl,
-                totalPl,
-                plPercentage,
-                effectiveStartPrice,
-                endPrice,
-                endQuantity,
-                tradeCount: symbolTrades.length,
-            });
-
-            if (totalPl !== 0 || realizedPl !== 0 || unrealizedPl !== 0) {
+            if (totalPlJpy !== 0) {
                  results.push({
                     symbol,
-                    name: effectiveName,
-                    realizedPl,
-                    unrealizedPl,
-                    totalPl,
+                    name: startData?.name || endData?.name || symbolNameMap.get(symbol) || symbol,
+                    realizedPl: realizedPlJpy,
+                    unrealizedPl: unrealizedPlJpy,
+                    totalPl: totalPlJpy,
                     plPercentage,
                 });
-            } else {
-                console.log(`[API DEBUG] -> Not added to results because all PL are zero.`);
             }
         }
 
