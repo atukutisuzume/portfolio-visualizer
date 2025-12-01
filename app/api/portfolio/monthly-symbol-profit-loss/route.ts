@@ -2,6 +2,8 @@
 // app/api/portfolio/monthly-symbol-profit-loss/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 import { USD_TO_JPY_RATE } from '@/lib/constants';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
@@ -19,6 +21,29 @@ const getMonthRange = (month: string) => {
     };
 };
 
+// 同じ銘柄コードのアイテムをマージするヘルパー
+const mergeDuplicateItems = (items: any[] | null) => {
+    if (!items) return [];
+    
+    const merged = new Map<string, any>();
+
+    for (const item of items) {
+        const currentItemValue = item.value || (item.price * item.quantity);
+        if (merged.has(item.code)) {
+            const existing = merged.get(item.code);
+            existing.quantity += item.quantity;
+            existing.value = (existing.value || 0) + currentItemValue;
+            if (existing.quantity !== 0) {
+                existing.price = existing.value / existing.quantity;
+            }
+        } else {
+            // Make a copy to avoid mutating the original array
+            merged.set(item.code, { ...item, value: currentItemValue });
+        }
+    }
+    return Array.from(merged.values());
+};
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // e.g., "2024-10"
@@ -28,12 +53,13 @@ export async function GET(request: Request) {
     }
 
     try {
+        const logFilePath = path.join(process.cwd(), 'pl_calculation_log.jsonl');
+        fs.writeFileSync(logFilePath, '');
+
         const { firstDay, lastDay } = getMonthRange(month);
         const [year, monthIndex] = month.split('-').map(Number);
         const endOfPreviousMonth = new Date(Date.UTC(year, monthIndex - 1, 0));
         const endOfPreviousMonthStr = endOfPreviousMonth.toISOString().split('T')[0];
-
-        console.log(`[API DEBUG] Calculating for month: ${month} (Base Date: ${endOfPreviousMonthStr}, End Date: ${lastDay})`);
 
         // 全銘柄のコードと名前のマップを作成
         const { data: allItems, error: allItemsError } = await supabase
@@ -65,7 +91,6 @@ export async function GET(request: Request) {
             throw new Error('前月の最終ポートフォリオ日付の取得に失敗しました。');
         }
         const startDate = lastPortfolioInPrevMonth?.data_date;
-        console.log(`[API DEBUG] Determined start date for portfolio items: ${startDate}`);
 
         // 当月のデータがある最終日を取得
         const { data: lastPortfolioInCurrentMonth, error: currentPortfolioError } = await supabase
@@ -82,12 +107,11 @@ export async function GET(request: Request) {
             throw new Error('当月の最終ポートフォリオ日付の取得に失敗しました。');
         }
         const endDate = lastPortfolioInCurrentMonth?.data_date;
-        console.log(`[API DEBUG] Determined end date for portfolio items: ${endDate}`);
 
         // 2. 必要なデータを並行して取得
         const [
-            { data: portfolioStart, error: errorStart },
-            { data: portfolioEnd, error: errorEnd },
+            { data: portfolioStartRaw, error: errorStart },
+            { data: portfolioEndRaw, error: errorEnd },
             { data: trades, error: errorTrades }
         ] = await Promise.all([
             // 月初ポートフォリオ項目を取得
@@ -107,19 +131,16 @@ export async function GET(request: Request) {
             throw new Error('DBからのデータ取得に失敗しました。');
         }
 
+        // 重複銘柄をマージ
+        const portfolioStart = mergeDuplicateItems(portfolioStartRaw);
+        const portfolioEnd = mergeDuplicateItems(portfolioEndRaw);
+
         // 月末総資産を計算
         const totalAssetAtEnd = (portfolioEnd || []).reduce((sum, item) => {
             const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1;
             const itemValue = item.value || (item.price * item.quantity);
             return sum + (itemValue * exchangeRate);
         }, 0);
-
-        console.log('[API DEBUG] Fetched and Processed Data:', {
-            portfolioStartCount: portfolioStart?.length || 0,
-            portfolioEndCount: portfolioEnd?.length || 0,
-            tradesCount: trades?.length || 0,
-            totalAssetAtEnd,
-        });
 
         // データを扱いやすいようにMapに変換
         const portfolioStartMap = new Map((portfolioStart || []).map(item => [item.code, item]));
@@ -131,8 +152,6 @@ export async function GET(request: Request) {
             ...(portfolioEnd?.map(p => p.code) || []),
             ...(trades?.map(t => t.symbol) || [])
         ]);
-
-        console.log(`[API DEBUG] Found ${allSymbols.size} unique symbols to process:`, Array.from(allSymbols));
 
         // 3. 銘柄ごとに損益を計算
         const results = [];
@@ -173,10 +192,43 @@ export async function GET(request: Request) {
 
             const plPercentage = totalAssetAtEnd > 0 ? (totalPlJpy / totalAssetAtEnd) : 0;
 
+            const name = startData?.name || endData?.name || symbolNameMap.get(symbol) || symbol;
+
+            const logData = {
+                symbol,
+                name,
+                calculation_inputs: {
+                    start_of_month: {
+                        date: startData?.data_date,
+                        value: startValue * exchangeRate,
+                    },
+                    end_of_month: {
+                        date: endData?.data_date,
+                        value: endValue * exchangeRate,
+                    },
+                    trades: symbolTrades.map(t => ({
+                        date: t.trade_date,
+                        side: t.side,
+                        price: t.price,
+                        quantity: t.quantity,
+                        amount: t.price * t.quantity * exchangeRate,
+                    })),
+                },
+                calculation_outputs: {
+                    boughtAmount: boughtAmount * exchangeRate,
+                    soldAmount: soldAmount * exchangeRate,
+                    totalPl: totalPlJpy,
+                    realizedPl: realizedPlJpy,
+                    unrealizedPl: unrealizedPlJpy,
+                }
+            };
+            fs.appendFileSync(logFilePath, JSON.stringify(logData, null, 2) + '\n---\n');
+
+
             if (totalPlJpy !== 0) {
                  results.push({
                     symbol,
-                    name: startData?.name || endData?.name || symbolNameMap.get(symbol) || symbol,
+                    name,
                     realizedPl: realizedPlJpy,
                     unrealizedPl: unrealizedPlJpy,
                     totalPl: totalPlJpy,
