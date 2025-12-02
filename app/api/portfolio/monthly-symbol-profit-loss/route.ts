@@ -1,4 +1,3 @@
-
 // app/api/portfolio/monthly-symbol-profit-loss/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -7,10 +6,8 @@ import path from 'path';
 import { USD_TO_JPY_RATE } from '@/lib/constants';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-// 定数として定義されているユーザーIDを使用
 const FAKE_USER_ID = '123e4567-e89b-12d3-a456-426614174000';
 
-// 月の初日と最終日を取得するヘルパー
 const getMonthRange = (month: string) => {
     const [year, monthIndex] = month.split('-').map(Number);
     const startDate = new Date(Date.UTC(year, monthIndex - 1, 1));
@@ -21,12 +18,9 @@ const getMonthRange = (month: string) => {
     };
 };
 
-// 同じ銘柄コードのアイテムをマージするヘルパー
 const mergeDuplicateItems = (items: any[] | null) => {
     if (!items) return [];
-    
     const merged = new Map<string, any>();
-
     for (const item of items) {
         const currentItemValue = item.value || (item.price * item.quantity);
         if (merged.has(item.code)) {
@@ -37,7 +31,6 @@ const mergeDuplicateItems = (items: any[] | null) => {
                 existing.price = existing.value / existing.quantity;
             }
         } else {
-            // Make a copy to avoid mutating the original array
             merged.set(item.code, { ...item, value: currentItemValue });
         }
     }
@@ -46,7 +39,7 @@ const mergeDuplicateItems = (items: any[] | null) => {
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month'); // e.g., "2024-10"
+    const month = searchParams.get('month');
 
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
         return NextResponse.json({ error: '月を "YYYY-MM" 形式で指定してください' }, { status: 400 });
@@ -57,187 +50,111 @@ export async function GET(request: Request) {
         fs.writeFileSync(logFilePath, '');
 
         const { firstDay, lastDay } = getMonthRange(month);
-        const [year, monthIndex] = month.split('-').map(Number);
-        const endOfPreviousMonth = new Date(Date.UTC(year, monthIndex - 1, 0));
-        const endOfPreviousMonthStr = endOfPreviousMonth.toISOString().split('T')[0];
+        const endOfPreviousMonthStr = new Date(Date.UTC(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]) - 1, 0)).toISOString().split('T')[0];
 
-        // 全銘柄のコードと名前のマップを作成
-        const { data: allItems, error: allItemsError } = await supabase
-            .from('portfolio_items')
-            .select('code, name');
+        // --- 1. 基準日を4つ決定する ---
+        const { data: p_usd_start } = await supabase.from('portfolios').select('data_date').lte('data_date', endOfPreviousMonthStr).order('data_date', { ascending: false }).limit(1).single();
+        const USD_START_DATE = p_usd_start?.data_date;
 
-        if (allItemsError) {
-            console.error({ allItemsError });
-            throw new Error('全銘柄の名称リスト取得に失敗しました。');
-        }
-        const symbolNameMap = new Map<string, string>();
-        for (const item of allItems) {
-            if (!symbolNameMap.has(item.code)) {
-                symbolNameMap.set(item.code, item.name);
-            }
-        }
+        const { data: p_jpy_start } = USD_START_DATE ? await supabase.from('portfolios').select('data_date').lt('data_date', USD_START_DATE).order('data_date', { ascending: false }).limit(1).single() : { data: null };
+        const JPY_START_DATE = p_jpy_start?.data_date;
 
-        // 1. 前月のデータがある最終日を取得
-        const { data: lastPortfolioInPrevMonth, error: lastPortfolioError } = await supabase
-            .from('portfolios')
-            .select('data_date')
-            .lte('data_date', endOfPreviousMonthStr)
-            .order('data_date', { ascending: false })
-            .limit(1)
-            .single();
+        const { data: p_jpy_end } = await supabase.from('portfolios').select('data_date').gte('data_date', firstDay).lte('data_date', lastDay).order('data_date', { ascending: false }).limit(1).single();
+        const JPY_END_DATE = p_jpy_end?.data_date;
 
-        if (lastPortfolioError && lastPortfolioError.code !== 'PGRST116') { // 'PGRST116' (query returned no rows) is not an error here
-            console.error({ lastPortfolioError });
-            throw new Error('前月の最終ポートフォリオ日付の取得に失敗しました。');
-        }
-        const startDate = lastPortfolioInPrevMonth?.data_date;
+        const { data: p_usd_end } = JPY_END_DATE ? await supabase.from('portfolios').select('data_date').lt('data_date', JPY_END_DATE).order('data_date', { ascending: false }).limit(1).single() : { data: null };
+        const USD_END_DATE = p_usd_end?.data_date;
+        
+        // --- 2. 必要なデータを並行取得 ---
+        const valuationDates = [...new Set([JPY_START_DATE, JPY_END_DATE, USD_START_DATE, USD_END_DATE])].filter(Boolean);
+        const tradeFetchStartDate = JPY_START_DATE || USD_START_DATE;
+        const tradeFetchEndDate = JPY_END_DATE;
 
-        // 当月のデータがある最終日を取得
-        const { data: lastPortfolioInCurrentMonth, error: currentPortfolioError } = await supabase
-            .from('portfolios')
-            .select('data_date')
-            .gte('data_date', firstDay)
-            .lte('data_date', lastDay)
-            .order('data_date', { ascending: false })
-            .limit(1)
-            .single();
-
-        if (currentPortfolioError && currentPortfolioError.code !== 'PGRST116') {
-            console.error({ currentPortfolioError });
-            throw new Error('当月の最終ポートフォリオ日付の取得に失敗しました。');
-        }
-        const endDate = lastPortfolioInCurrentMonth?.data_date;
-
-        // 2. 必要なデータを並行して取得
         const [
-            { data: portfolioStartRaw, error: errorStart },
-            { data: portfolioEndRaw, error: errorEnd },
-            { data: trades, error: errorTrades }
+            { data: portfolioItems, error: portfolioItemsError },
+            { data: trades, error: tradesError }
         ] = await Promise.all([
-            // 月初ポートフォリオ項目を取得
-            startDate
-                ? supabase.from('portfolio_items').select('data_date, code, name, quantity, price, currency, value').eq('data_date', startDate)
-                : Promise.resolve({ data: [], error: null }),
-            // 月末ポートフォリオ項目を取得
-            endDate
-                ? supabase.from('portfolio_items').select('data_date, code, name, quantity, price, currency, value').eq('data_date', endDate)
-                : Promise.resolve({ data: [], error: null }),
-            // 月内の取引履歴を取得
-            supabase.from('trade_history').select('symbol, side, price, quantity, currency, trade_date').eq('user_id', FAKE_USER_ID).gte('trade_date', firstDay).lte('trade_date', lastDay)
+            supabase.from('portfolio_items').select('data_date, code, name, quantity, price, currency, value').in('data_date', valuationDates),
+            (tradeFetchStartDate && tradeFetchEndDate)
+                ? supabase.from('trade_history').select('symbol, side, price, quantity, currency, trade_date').eq('user_id', FAKE_USER_ID).gte('trade_date', tradeFetchStartDate).lte('trade_date', tradeFetchEndDate)
+                : Promise.resolve({ data: [], error: null })
         ]);
 
-        if (errorStart || errorEnd || errorTrades) {
-            console.error({ errorStart, errorEnd, errorTrades });
-            throw new Error('DBからのデータ取得に失敗しました。');
-        }
+        if (portfolioItemsError || tradesError) throw new Error('DBからのデータ取得に失敗しました。');
 
-        // 重複銘柄をマージ
-        const portfolioStart = mergeDuplicateItems(portfolioStartRaw);
-        const portfolioEnd = mergeDuplicateItems(portfolioEndRaw);
+        // --- 3. データを日付ごとに整理・マージ ---
+        const portfolioJpyStart = mergeDuplicateItems(portfolioItems?.filter(item => item.data_date === JPY_START_DATE) || []);
+        const portfolioJpyEnd = mergeDuplicateItems(portfolioItems?.filter(item => item.data_date === JPY_END_DATE) || []);
+        const portfolioUsdStart = mergeDuplicateItems(portfolioItems?.filter(item => item.data_date === USD_START_DATE) || []);
+        const portfolioUsdEnd = mergeDuplicateItems(portfolioItems?.filter(item => item.data_date === USD_END_DATE) || []);
 
-        // 月末総資産を計算
-        const totalAssetAtEnd = (portfolioEnd || []).reduce((sum, item) => {
-            const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1;
-            const itemValue = item.value || (item.price * item.quantity);
-            return sum + (itemValue * exchangeRate);
+        const portfolioJpyStartMap = new Map(portfolioJpyStart.map(item => [item.code, item]));
+        const portfolioJpyEndMap = new Map(portfolioJpyEnd.map(item => [item.code, item]));
+        const portfolioUsdStartMap = new Map(portfolioUsdStart.map(item => [item.code, item]));
+        const portfolioUsdEndMap = new Map(portfolioUsdEnd.map(item => [item.code, item]));
+
+        // --- 4. 計算準備 ---
+        const totalAssetAtEnd = portfolioJpyEnd.reduce((sum, item) => {
+             const exchangeRate = item.currency === 'USD' ? USD_TO_JPY_RATE : 1;
+             return sum + ((item.value || item.price * item.quantity) * exchangeRate);
         }, 0);
 
-        // データを扱いやすいようにMapに変換
-        const portfolioStartMap = new Map((portfolioStart || []).map(item => [item.code, item]));
-        const portfolioEndMap = new Map((portfolioEnd || []).map(item => [item.code, item]));
-
-        // 2. 関連するすべての銘柄コードを取得
         const allSymbols = new Set([
-            ...(portfolioStart?.map(p => p.code) || []),
-            ...(portfolioEnd?.map(p => p.code) || []),
+            ...portfolioJpyStart.map(p => p.code), ...portfolioJpyEnd.map(p => p.code),
+            ...portfolioUsdStart.map(p => p.code), ...portfolioUsdEnd.map(p => p.code),
             ...(trades?.map(t => t.symbol) || [])
         ]);
 
-        // 3. 銘柄ごとに損益を計算
+        // --- 5. 銘柄ごとに損益を計算 ---
         const results = [];
         for (const symbol of allSymbols) {
-            const startData = portfolioStartMap.get(symbol);
-            const endData = portfolioEndMap.get(symbol);
-            const symbolTrades = trades?.filter(t => t.symbol === symbol) || [];
-
-            const currency = startData?.currency || endData?.currency || symbolTrades[0]?.currency || 'JPY';
+            const tempItem = portfolioJpyStartMap.get(symbol) || portfolioJpyEndMap.get(symbol) || portfolioUsdStartMap.get(symbol) || portfolioUsdEndMap.get(symbol);
+            const currency = tempItem?.currency || trades?.find(t=>t.symbol === symbol)?.currency || 'JPY';
             const exchangeRate = currency === 'USD' ? USD_TO_JPY_RATE : 1;
 
-            // 月初の評価額
-            const startValue = (startData?.value || (startData?.price * startData?.quantity) || 0);
+            let startData, endData, symbolTrades;
+            if (currency === 'USD') {
+                startData = portfolioUsdStartMap.get(symbol);
+                endData = portfolioUsdEndMap.get(symbol);
+                symbolTrades = trades?.filter(t => t.symbol === symbol && t.trade_date >= USD_START_DATE && t.trade_date <= USD_END_DATE) || [];
+            } else { // JPY
+                startData = portfolioJpyStartMap.get(symbol);
+                endData = portfolioJpyEndMap.get(symbol);
+                symbolTrades = trades?.filter(t => t.symbol === symbol && t.trade_date >= JPY_START_DATE && t.trade_date <= JPY_END_DATE) || [];
+            }
 
-            // 月末の評価額
-            const endValue = (endData?.value || (endData?.price * endData?.quantity) || 0);
+            const startValue = startData?.value || (startData?.price * startData?.quantity) || 0;
+            const endValue = endData?.value || (endData?.price * endData?.quantity) || 0;
 
-            // 月内の売買金額
-            const boughtAmount = symbolTrades
-                .filter(t => t.side === 'buy')
-                .reduce((sum, t) => sum + t.price * t.quantity, 0);
+            const boughtAmount = symbolTrades.filter(t => t.side === 'buy').reduce((sum, t) => sum + t.price * t.quantity, 0);
+            const soldAmount = symbolTrades.filter(t => t.side === 'sell').reduce((sum, t) => sum + t.price * t.quantity, 0);
 
-            const soldAmount = symbolTrades
-                .filter(t => t.side === 'sell')
-                .reduce((sum, t) => sum + t.price * t.quantity, 0);
-
-            // 新しい計算ロジックを適用
             const totalPl = (endValue + soldAmount) - (startValue + boughtAmount);
-            
-            // 損益の内訳を計算
-            const realizedPl = soldAmount - boughtAmount; // 売買によるキャッシュフロー
-            const unrealizedPl = endValue - startValue; // 保有資産の評価額変動
+            const realizedPl = soldAmount - boughtAmount;
+            const unrealizedPl = endValue - startValue;
 
-            // 円換算
             const totalPlJpy = totalPl * exchangeRate;
             const realizedPlJpy = realizedPl * exchangeRate;
             const unrealizedPlJpy = unrealizedPl * exchangeRate;
-
             const plPercentage = totalAssetAtEnd > 0 ? (totalPlJpy / totalAssetAtEnd) : 0;
 
-            const name = startData?.name || endData?.name || symbolNameMap.get(symbol) || symbol;
+            const name = tempItem?.name || 'N/A';
 
             const logData = {
-                symbol,
-                name,
+                symbol, name, currency,
                 calculation_inputs: {
-                    start_of_month: {
-                        date: startData?.data_date,
-                        value: startValue * exchangeRate,
-                    },
-                    end_of_month: {
-                        date: endData?.data_date,
-                        value: endValue * exchangeRate,
-                    },
-                    trades: symbolTrades.map(t => ({
-                        date: t.trade_date,
-                        side: t.side,
-                        price: t.price,
-                        quantity: t.quantity,
-                        amount: t.price * t.quantity * exchangeRate,
-                    })),
+                    start_of_month: { date: startData?.data_date, value: startValue * exchangeRate },
+                    end_of_month: { date: endData?.data_date, value: endValue * exchangeRate },
+                    trades: symbolTrades.map(t => ({ date: t.trade_date, side: t.side, price: t.price, quantity: t.quantity, amount: t.price * t.quantity * exchangeRate })),
                 },
-                calculation_outputs: {
-                    boughtAmount: boughtAmount * exchangeRate,
-                    soldAmount: soldAmount * exchangeRate,
-                    totalPl: totalPlJpy,
-                    realizedPl: realizedPlJpy,
-                    unrealizedPl: unrealizedPlJpy,
-                }
+                calculation_outputs: { boughtAmount: boughtAmount * exchangeRate, soldAmount: soldAmount * exchangeRate, totalPl: totalPlJpy, realizedPl: realizedPlJpy, unrealizedPl: unrealizedPlJpy }
             };
             fs.appendFileSync(logFilePath, JSON.stringify(logData, null, 2) + '\n---\n');
 
-
             if (totalPlJpy !== 0) {
-                 results.push({
-                    symbol,
-                    name,
-                    realizedPl: realizedPlJpy,
-                    unrealizedPl: unrealizedPlJpy,
-                    totalPl: totalPlJpy,
-                    plPercentage,
-                });
+                 results.push({ symbol, name, realizedPl: realizedPlJpy, unrealizedPl: unrealizedPlJpy, totalPl: totalPlJpy, plPercentage });
             }
         }
-
-        console.log(`[API DEBUG] Final results count: ${results.length}`);
         
         const responsePayload = {
             results: results.sort((a, b) => b.totalPl - a.totalPl),
